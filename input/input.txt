@@ -1,0 +1,13 @@
+create table assassins(id INT auto_increment not null, name TEXT not null, surname TEXT not null,  primary key(id));
+create table jobDone(id INT auto_increment not null,target TEXT, assassin INT not null, primary key(id), foreign key(assassin) references assassins(id));
+insert into assassins(name,surname) values('John','Wick');
+insert into jobDone(target,assassin) values('Donato Matteucci',0);
+insert into assassins(name,surname) values('Ezio','Auditore');
+insert into assassins(name,surname) values('Jhin','Khada');
+insert into assassins(name,surname) values('Sekiro','Masamune');
+insert into assassins(name,surname) values('Master','Yi');
+insert into jobDone(target,assassin) values('Garen Demacia',1);
+insert into jobDone(target,assassin) values('Crystal Sage',2);
+insert into jobDone(target,assassin) values('Jeffer Donovan',0);
+insert into jobDone(target,assassin) values('Zed Of Twilight',2);
+
