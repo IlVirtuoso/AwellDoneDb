@@ -175,7 +175,7 @@ namespace WellDoneDB
         }
     };
 
-    class Null : Type
+    class Null : public Type
     {
     public:
         Null()
@@ -186,20 +186,21 @@ namespace WellDoneDB
         std::string toString() { return std::string{"NULL"}; }
         bool operator>(Type &type)
         {
-            return 0;
+            return false;
         }
 
         bool operator<(Type &type)
         {
             if (type.getType() != Types::NULLED && !type.isNull())
-                return 1;
+                return true;
             else
-                return 0;
+                return false;
         }
         bool operator==(Type &type)
         {
             if (type.getType() == Types::NULLED || type.isNull())
-                return 1;
+                return true;
+            return false;
         }
     };
 
