@@ -1,7 +1,7 @@
 #pragma once
 namespace WellDoneDB
 {
-    Column::Column(std::string name, std::string tableName, Types type, std::vector<Type *> elements, bool not_null, bool index, bool autoincrent, Column *references, std::vector<Column *> referenced) : not_null{not_null}, index{index}, autoincrement{autoincrement}, reference{reference}, tableName{tableName}, referenced{referenced}
+    Column::Column(std::string name, std::string tableName, Types type, std::vector<Type *> elements, bool not_null, bool index, bool autoincrement, Column *references, std::vector<Column *> referenced) : not_null{not_null}, index{index}, autoincrement{autoincrement}, reference{references}, tableName{tableName}, referenced{referenced}, name{name}, type{type}
     {
         if (autoincrement && type != Types::INT)
             throw new Bad_Column("cannot declare autoincrement column " + name + "of type not INT");
@@ -43,7 +43,7 @@ namespace WellDoneDB
         }
         else
         {
-            data.push_back(Pair<Type *, int>{&elem, data[data.size() - 1].key++});
+            data.push_back(Pair<Type *, int>{&elem, data[data.size() - 1].key + 1});
         }
     }
 
@@ -104,73 +104,11 @@ namespace WellDoneDB
 
     void Column::remove(Type *elem, bool drop) { remove(*elem, drop); }
 
-    Type &Column::at(int index) { return *data[index].value; }
-    Type &Column::operator[](int index) { return *data[index].value; }
-    Column Column::select(Conditions condition, Type &compareData)
-    {
-        std::vector<Pair<Type *, int>> selection;
-        for (int i = 0; i < data.size(); i++)
-        {
-            switch (condition)
-            {
-            case Conditions::EQUAL:
-                if (*data[i].value == compareData)
-                    selection.push_back(data[i]);
-                break;
-            case Conditions::GREATEREQTHAN:
-                if (*data[i].value >= compareData)
-                    selection.push_back(data[i]);
-                break;
+    Type *Column::at(int index) { return data[index].value; }
+    Type *Column::operator[](int index) { return data[index].value; }
 
-            case Conditions::GREATHERTHAN:
-                if (*data[i].value > compareData)
-                    selection.push_back(data[i]);
-                break;
 
-            case Conditions::LESSEQTHAN:
-                if (*data[i].value <= compareData)
-                    selection.push_back(data[i]);
-                break;
 
-            case Conditions::LESSTHAN:
-                if (*data[i].value < compareData)
-                    selection.push_back(data[i]);
-                break;
-
-            case Conditions::NOT:
-                if (*data[i].value != compareData)
-                    selection.push_back(data[i]);
-                break;
-
-            default:
-                break;
-            }
-        }
-        return Column(std::string{tableName + "." + name}, std::string{}, type, selection, not_null, false, autoincrement, reference, referenced);
-    }
-    Column Column::select(std::vector<int> positions)
-    {
-        if (positions.empty())
-            return Column(tableName + "." + name, std::string{}, type, std::vector<Pair<Type*,int>>{}, not_null, false, autoincrement, reference, referenced);
-        if (positions.size() > data.size())
-            return *this;
-        std::vector<Pair<Type *, int>> selection;
-
-        for (int i = 0; i < positions.size(); i++)
-        {
-            if (data[positions[i]].key == positions[i])
-                selection.push_back(data[positions[i]]);
-            else
-            {
-                for (int j = 0; j < data.size(); j++)
-                {
-                    if (data[j].key == positions[i])
-                        selection.push_back(data[j]);
-                }
-            }
-        }
-        return Column(tableName + "." + name, std::string{}, type, selection, not_null, false, autoincrement, reference, referenced);
-    }
 
     bool Column::exist(Type &elem)
     {
@@ -197,6 +135,127 @@ namespace WellDoneDB
             pos.push_back(data[i].key);
         }
         return pos;
+    }
+
+    Selection::Selection(Column& col, Conditions condition, Type* dataCompare) : condition{ condition }, dataCompare{ dataCompare }, col{ &col } {
+        for (int i = 0; i < col.getSize(); i++) {
+            switch (condition)
+            {
+            case WellDoneDB::Conditions::EQUAL:
+                if (*col[i] == *dataCompare)
+                    positions.push_back(col.get(i));
+                break;
+            case WellDoneDB::Conditions::LESSTHAN:
+                if (*col[i] < *dataCompare)
+                    positions.push_back(col.get(i));
+                break;
+            case WellDoneDB::Conditions::GREATHERTHAN:
+                if (*col[i] > *dataCompare)
+                    positions.push_back(col.get(i));
+                break;
+            case WellDoneDB::Conditions::LESSEQTHAN:
+                if (*col[i] <= *dataCompare)
+                    positions.push_back(col.get(i));
+                break;
+            case WellDoneDB::Conditions::GREATEREQTHAN:
+                if (*col[i] >= *dataCompare)
+                    positions.push_back(col.get(i));
+                break;
+            case WellDoneDB::Conditions::NOT:
+                if (*col[i] != *dataCompare)
+                    positions.push_back(col.get(i));
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    Selection Selection::operator&&(Selection& sel) {
+        Selection newSel;
+        for (int i = 0; i < this->positions.size(); i++) {
+            int check = this->positions[i].key;
+            if (check <= sel.positions.size()) {
+                switch (sel.condition)
+                {
+                case Conditions::EQUAL:
+                    if (*sel.positions[check].value == *sel.dataCompare)
+                        newSel.positions.push_back(this->positions[check]);
+                    break;
+
+                case Conditions::GREATEREQTHAN:
+                    if (*sel.positions[check].value >= *sel.dataCompare)
+                        newSel.positions.push_back(this->positions[check]);
+                    break;
+                case Conditions::GREATHERTHAN:
+                    if (*sel.positions[check].value > *sel.dataCompare)
+                        newSel.positions.push_back(this->positions[check]);
+                    break;
+
+                case Conditions::LESSEQTHAN:
+                    if (*sel.positions[check].value <= *sel.dataCompare)
+                        newSel.positions.push_back(this->positions[check]);
+                    break;
+
+                case Conditions::LESSTHAN:
+                    if (*sel.positions[check].value < *sel.dataCompare)
+                        newSel.positions.push_back(this->positions[check]);
+                    break;
+
+                case Conditions::NOT:
+                    if (*sel.positions[check].value != *sel.dataCompare)
+                        newSel.positions.push_back(this->positions[check]);
+                    break;
+                case Conditions::BETWEEN:
+                    if (*sel.positions[check].value <= *sel.high && *sel.positions[check].value >= *sel.high)
+                        newSel.positions.push_back(this->positions[check]);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+        return newSel;
+    }
+
+    bool Selection::exist(Pair<Type*, int>& check) {
+        for (int i = 0; i < positions.size(); i++) {
+            if (positions[i].key == check.key)
+                return true;
+        }
+        return false;
+    }
+
+    Selection Selection::operator||(Selection& sel) {
+        Selection newSel;
+        newSel.col = this->col;
+        newSel.condition = this->condition;
+        newSel.dataCompare = this->dataCompare;
+        int i = 0, j = 0;
+        while (i < this->positions.size() && j < sel.positions.size()) {
+            if (this->positions[i].key > sel.positions[j].key) {
+                newSel.positions.push_back(this->col->get(this->positions[i].key));
+                i++;
+            }
+            else if (this->positions[i].key < sel.positions[j].key) {
+                newSel.positions.push_back(this->col->get(sel.positions[j].key));
+                j++;
+            }
+            else {
+                newSel.positions.push_back(this->col->get(this->positions[i].key));
+                i++;
+                j++;
+            }
+        }
+        while (i < this->positions.size()) {
+            if (!this->exist(positions[i]))
+                this->positions.push_back(this->col->get(this->positions[i].key));
+        }
+        while (j < sel.positions.size()) {
+            if (!this->exist(sel.positions[j]))
+                this->positions.push_back(this->col->get(sel.positions[j].key));
+        }
+        return newSel;
     }
 
     VectorizedTable::VectorizedTable(std::string name, std::vector<Column*> cols) : name{ name } {
@@ -226,28 +285,30 @@ namespace WellDoneDB
         }
         return max;
     }
-    void VectorizedTable::addRow(std::vector<Type*> data, std::vector<string> columnNames) {
+    void VectorizedTable::addRow(std::vector<Type*> data, std::vector<string> columnNames, bool check) {
         if (data.size() != columnNames.size())
             throw new Bad_Table("vector of data and names of different sizes");
         for (int i = 0; i < data.size(); i++) {
             (*this)[columnNames[i]]->add(data[i]);
         }
-        int normSize = this->getMaxSize();
-        for (int i = 0; i < columns.size(); i++) {
-            if (columns[i]->getSize() < normSize) {
-                if (columns[i]->autoincrement) {
-                    Integer& prev = dynamic_cast<Integer&>(columns[i]->at(columns[i]->getSize() - 1));
-                    columns[i]->add(new Integer(prev.getData() + 1));
-                }
-                else if (!columns[i]->not_null) {
-                    columns[i]->add(new Null());
-                }
-                else {
-                    for (int j = 0; j < columns.size(); j++) {
-                        if (columns[j]->getSize() == normSize)
-                            columns[j]->remove(normSize - 1, true);
+        if (check) {
+            int normSize = this->getMaxSize();
+            for (int i = 0; i < columns.size(); i++) {
+                if (columns[i]->getSize() < normSize) {
+                    if (columns[i]->autoincrement) {
+                        Integer& prev = dynamic_cast<Integer&>(*columns[i]->at(columns[i]->getSize() - 1));
+                        columns[i]->add(new Integer(prev.getData() + 1));
                     }
-                    throw new Bad_Table("error Missing data for column: " + columns[i]->getName());
+                    else if (!columns[i]->not_null) {
+                        columns[i]->add(new Null());
+                    }
+                    else {
+                        for (int j = 0; j < columns.size(); j++) {
+                            if (columns[j]->getSize() == normSize)
+                                columns[j]->remove(normSize - 1, true);
+                        }
+                        throw new Bad_Table("error Missing data for column: " + columns[i]->getName());
+                    }
                 }
             }
         }
@@ -296,10 +357,107 @@ namespace WellDoneDB
     }
 
     Column* VectorizedTable::operator[](std::string columnName) {
-        for (int i = 0; i < columns.size(); i++)
-            if (columns[i]->getName() == name)
+        for (int i = 0; i < columns.size(); i++) {
+            if (columns[i]->getName() == columnName)
                 return columns[i];
-        throw new Bad_Table("Column: " + columnName + "don't exist");
+        }
+        throw new Bad_Table("Column: " + columnName + " don't exist");
+    }
+
+
+    void VectorizedTable::addRow(std::vector<Type*> data) {
+        if (data.size() != this->getColNum())
+            throw new Bad_Table("cannot use autoAdd method with vector of different size of columns");
+        for (int i = 0; i < data.size(); i++) {
+            this->at(i)->add(data[i]);
+        }
+    }
+
+    std::vector<Type*> VectorizedTable::getRow(int index){
+        std::vector<Type*> vec;
+        for (int i = 0; i < this->columns.size(); i++) {
+            vec.push_back(this->columns[i]->at(index));
+        }
+        return vec;
+    }
+
+    void VectorizedTable::copy(Table& table) {
+        for (int i = 0; i < table.getColNum(); i++) {
+            this->createColumn(table.getName() + "." + table.at(i)->getName(), table.at(i)->getType(), false, false, false);
+        }
+    }
+
+    std::vector<std::string> VectorizedTable::getColNames() {
+        std::vector<std::string> vec;
+        for (int i = 0; i < this->columns.size(); i++) {
+            vec.push_back(this->columns[i]->getName());
+        }
+        return vec;
+    }
+    
+    VectorizedTable VectorizedTable::operator*(Table& table) {
+        VectorizedTable tab("X");
+        tab.copy(*this);
+        tab.copy(table);
+        std::vector<std::string> thisreferences = this->getColNames();
+        std::vector<std::string> tablereferences = table.getColNames();
+        for (int i = 0; i < thisreferences.size(); i++) {
+            thisreferences[i] = this->getName() + "." + thisreferences[i];
+        }
+        for (int i = 0; i < tablereferences.size(); i++) {
+            tablereferences[i] = table.getName() + "." + tablereferences[i];
+        }
+        int thisColSizeReference = this->columns.at(0)->getSize();
+        int tableColSizeReference = table.at(0)->getSize();
+        for (int i = 0; i < thisColSizeReference; i++) {
+            for (int j = 0; j < tableColSizeReference; j++) {
+                tab.addRow(this->getRow(i), thisreferences,false);
+                tab.addRow(table.getRow(j), tablereferences, false);
+            }
+        }
+        return tab;
+    }
+
+    std::vector<int> Selection::getPos() {
+        std::vector<int> newVec;
+        for (int i = 0; i < this->positions.size(); i++) {
+            newVec.push_back(this->positions[i].key);
+        }
+        return newVec;
+    }
+
+    Selection::Selection(Column& col, Type* low, Type* high) : condition{ Conditions::BETWEEN }, low{ low }, high{ high }, col{ &col } {
+        for (int i = 0; i < col.getSize(); i++) {
+            if (*col[i] <= *high && *col[i] >= *low)
+                this->positions.push_back(col.get(i));
+        }  
+    }
+
+    std::string VectorizedTable::toString() {
+        std::string str("COLUMNS:");
+        int columnReferenceSize = this->columns.at(0)->getSize();
+        for (int i = 0; i < this->getColNum(); i++) {
+            str = str + "|" +this->getColNames().at(i)+"("+typeToString(this->columns[i]->getType()) + ")";
+        }
+        str += "\n\n";
+        for (int i = 0; i < columnReferenceSize; i++) {
+            str += to_string(this->columns[0]->get(i).key) +" |";
+            for (int j = 0; j < this->columns.size(); j++) {
+                str += "|" + this->columns[j]->at(i)->toString();
+            }
+            str += "\n";
+        }
+        return str;
+    }
+
+    VectorizedTable VectorizedTable::select(Selection& sel) {
+        VectorizedTable newTab("Selection of:"+this->name);
+        newTab.copy(*this);
+        auto positions = sel.getPos();
+        for (int i = 0; i < positions.size(); i++) {
+            newTab.addRow(this->getRow(positions[i]));
+        }
+        return newTab;
     }
 
 } // namespace WellDoneDB

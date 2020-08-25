@@ -29,12 +29,21 @@ vector<Type*> generateTime(){
 }
 
 int main(int argc, char * argv[]){
-    Column colTime("Times","site",Types::TIME,generateTime());
-    Column colDate("Dates", "site", Types::DATE,generateDate());
-    Time t1(10,01);
-    Date d1("20-11-1997",Date::DD_MM_YYYY);
-    Column selectedColTime = colTime.select(Conditions::GREATEREQTHAN,t1);
-    Column selectedDate = colDate.select(selectedColTime.getPositions());
-    cout<<selectedDate.toString() << selectedColTime.toString()<<endl;
-      
+    VectorizedTable* t1 = new VectorizedTable("site");
+    t1->createColumn("Date", Types::DATE);
+    t1->createColumn("Time", Types::TIME);
+    VectorizedTable* t2 = new VectorizedTable("ids");
+    t2->createColumn("Date", Types::DATE);
+    t2->createColumn("IDs", Types::INT);
+    auto dates = generateDate();
+    auto times = generateTime();
+    auto ints = generateInt();
+    for (int i = 0; i < 100; i++) {
+        t1->addRow({ dates[rand() % 100],times[rand() % 100] }, { "Date","Time" });
+        t2->addRow({ dates[rand() % 100], ints[rand() % 100] }, { "Date", "IDs" });
+    }
+    Selection sel(*t1->operator[]("Date"), Conditions::GREATEREQTHAN, new Date("20-11-1997",Date::DD_MM_YYYY));
+    Selection sel2(*t1->operator[]("Date"), Conditions::LESSEQTHAN, new Date("20-11-1997", Date::DD_MM_YYYY));
+    *t1 = t1->select(sel || sel2);
+    cout << t1->toString() << endl;
 }

@@ -73,6 +73,7 @@ namespace WellDoneDB
         }
     }
 
+
     bool Date::operator<(Type &type)
     {
         if (this->type != type.getType())
@@ -209,4 +210,6 @@ namespace WellDoneDB
             break;
         }
     }
+
+    
 } // namespace WellDoneDB

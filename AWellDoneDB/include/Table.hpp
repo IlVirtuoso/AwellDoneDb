@@ -1,3 +1,4 @@
+
 #pragma once
 #include <map>
 namespace WellDoneDB
@@ -9,9 +10,12 @@ namespace WellDoneDB
         GREATHERTHAN,
         LESSEQTHAN,
         GREATEREQTHAN,
-        NOT
+        NOT,
+        BETWEEN
     };
 
+
+    class Selection;
     class Column
     {
     private:
@@ -21,7 +25,6 @@ namespace WellDoneDB
         std::vector<Column *> referenced;
         std::string name;
         std::string tableName;
-        void add(Type &data, int position);
 
     public:
         class Bad_Column : exception
@@ -43,14 +46,36 @@ namespace WellDoneDB
         bool exist(Type &data);
         void inline addReferenced(Column *column) { referenced.push_back(column); }
         void inline setReference(Column *column) { reference = column; }
-        Column select(Conditions condition, Type &dataCompare);
-        Column select(std::vector<int> positions);
-        Type &at(int index);
-        Type &operator[](int index);
+        Types inline getType() { return this->type; }
+        Type *at(int index);
+        Pair<Type*, int> get(int index) { return this->data[index]; }
+        Type *operator[](int index);
         std::vector<int> getPositions();
         std::string toString();
         std::string inline getName() { return this->name; }
         int inline getSize() { return this->data.size(); }
+    };
+
+    /**
+     * @brief 
+     * @TODO implement between operator
+     * 
+     */
+    class Selection {
+    private:
+        std::vector<Pair<Type*, int>> positions;
+        Conditions condition;
+        Type* dataCompare,* high, * low;
+        Column* col;
+        bool exist(Pair<Type*, int>& check);
+    public:
+        Selection(Column& col, Conditions condition, Type* dataCompare);
+        Selection(Column& col, Type* lowInterval, Type* highInterval);
+        Selection(){}
+        Selection operator||(Selection& sel);
+        Selection operator&&(Selection& sel);
+        std::vector<int> getPos();
+        
     };
 
     class Table
@@ -66,29 +91,51 @@ namespace WellDoneDB
             Bad_Table(std::string message) { std::cout << message << std::endl; }
         };
         virtual void createColumn(std::string columnName, Types columnType, bool not_null = false, bool autoincrement = false, bool index = false) = 0;
-        virtual void addRow(std::vector<Type *> data, std::vector<string> columnNames) = 0;
+        virtual void addRow(std::vector<Type*> data, std::vector<string> columnNames, bool check = true) = 0;
         virtual void removeRow(int index, bool drop = false) = 0;
         virtual void removeRows(std::vector<int> indexes, bool drop = false) = 0;
         virtual bool columnExist(std::string name) = 0;
         virtual Column* operator[](std::string columnName) = 0;
+        virtual Column* at(int index) = 0;
+        virtual std::string getName() = 0;
+        virtual std::vector<Type*> getRow(int index) = 0;
+        virtual int getColNum() = 0;
+        virtual void copy(Table& table) = 0;
+        virtual std::vector<Type*> operator[](int index) = 0;
+        virtual std::string toString() = 0;
+        virtual std::vector<std::string> getColNames() = 0;
     };
 
     class VectorizedTable : public Table
     {
     private:
+        std::string name;
         int getMaxSize();
         std::vector<Column*> columns;
-        std::string name;
     protected:
     void loadColumn(Column* column);
     public:
         VectorizedTable(std::string name, std::vector<Column*> cols = std::vector<Column*>{});
         void createColumn(std::string columnName, Types columnType, bool not_null = false, bool autoincrement = false, bool index = false) override;
-        void addRow(std::vector<Type *> data, std::vector<string> columnNames) override;
+        void addRow(std::vector<Type*> data, std::vector<string> columnNames, bool check = true) override;
+        void addRow(std::vector<Type*> data);
         void removeRow(int index, bool drop = false) override;
         bool columnExist(std::string name) override;
         void removeRows(std::vector<int> indexes, bool drop = false) override;
+        std::vector<Type*> getRow(int index) override;
         Column* operator[](std::string columnName) override;
+        std::vector<Type*> operator[](int index) override { return getRow(index); }
+        std::string getName() { return this->name; }
+        int getColNum() { return this->columns.size(); }
+        Column* at(int index) { return this->columns[index]; }
+        VectorizedTable operator*(Table& table);
+        void copy(Table& table) override;
+        std::vector<std::string> getColNames() override;
+        std::string toString() override;
+        VectorizedTable select(Selection& sel);
     };
+
+
+    
 
 } // namespace WellDoneDB
