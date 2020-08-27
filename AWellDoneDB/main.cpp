@@ -1,5 +1,5 @@
 #include <iostream>
-#include "./include/AWellDoneDB.hpp"
+#include "include/Database.hpp"
 
 using namespace std;
 using namespace WellDoneDB;
@@ -33,6 +33,7 @@ int main(int argc, char * argv[]){
     t1->createColumn("Date", Types::DATE);
     t1->createColumn("Time", Types::TIME);
     VectorizedTable* t2 = new VectorizedTable("ids");
+    Database db("db");
     t2->createColumn("Date", Types::DATE);
     t2->createColumn("IDs", Types::INT);
     auto dates = generateDate();
@@ -42,8 +43,8 @@ int main(int argc, char * argv[]){
         t1->addRow({ dates[rand() % 100],times[rand() % 100] }, { "Date","Time" });
         t2->addRow({ dates[rand() % 100], ints[rand() % 100] }, { "Date", "IDs" });
     }
-    Selection sel(*t1->operator[]("Date"), Conditions::GREATEREQTHAN, new Date("20-11-1997",Date::DD_MM_YYYY));
-    Selection sel2(*t1->operator[]("Date"), Conditions::LESSEQTHAN, new Date("20-11-1997", Date::DD_MM_YYYY));
-    *t1 = t1->select(sel || sel2);
+    Selection sel(*t1->operator[]("Date"), Conditions::LESSTHAN, new Date("20-11-1997",Date::DD_MM_YYYY));
+    Selection sel2(*t1->operator[]("Date"), Conditions::GREATHERTHAN, new Date("20-11-1997", Date::DD_MM_YYYY));
+    t1->removeRow(3, false);
     cout << t1->toString() << endl;
 }

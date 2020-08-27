@@ -2,7 +2,7 @@
   "configurations": [
     {
       "name": "x64-Debug",
-      "generator": "Unix Makefiles",
+      "generator": "Ninja",
       "configurationType": "Debug",
       "inheritEnvironments": [ "gcc-arm" ],
       "buildRoot": "${projectDir}\\out\\build\\${name}",

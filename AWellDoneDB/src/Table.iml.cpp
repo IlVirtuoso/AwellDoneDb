@@ -1,7 +1,8 @@
 #pragma once
+#include "../include/Table.hpp"
 namespace WellDoneDB
 {
-    Column::Column(std::string name, std::string tableName, Types type, std::vector<Type *> elements, bool not_null, bool index, bool autoincrement, Column *references, std::vector<Column *> referenced) : not_null{not_null}, index{index}, autoincrement{autoincrement}, reference{references}, tableName{tableName}, referenced{referenced}, name{name}, type{type}
+    Column::Column(std::string name, std::string tableName, Types type, std::vector<Type *> elements, bool not_null, bool index, bool autoincrement) : not_null{not_null}, index{index}, autoincrement{autoincrement}, tableName{tableName}, name{name}, type{type}
     {
         if (autoincrement && type != Types::INT)
             throw new Bad_Column("cannot declare autoincrement column " + name + "of type not INT");
@@ -30,11 +31,6 @@ namespace WellDoneDB
                 throw new Bad_Column("Adding NULL element on index column :" + name);
             }
         }
-        if (reference != nullptr)
-        {
-            if (!reference->exist(elem))
-                throw new Bad_Column("Adding element not present in the referenced column : " + reference->tableName + "(" + reference->name + ")" + "<-->" + tableName + "(" + name + ":" + elem.toString() + ")");
-        }
         if (elem.getType() != type)
             throw new Bad_Column("Adding element of type: " + typeToString(elem.getType()) + "to a column of type: " + typeToString(type));
         if (data.empty())
@@ -49,23 +45,8 @@ namespace WellDoneDB
 
     void Column::add(Type *elem) { add(*elem); }
 
-    bool Column::removable(Type &elem)
-    {
-        if (referenced.size() > 0)
-            for (int i = 0; i < referenced.size(); i++)
-                if (!referenced[i]->exist(elem))
-                    return false;
-        return true;
-    }
-
-    bool Column::removable(int index) { return removable(*data[index].value); }
-
     void Column::remove(Type &elem, bool drop)
     {
-        if (referenced.size() > 0)
-            for (int i = 0; i < referenced.size(); i++)
-                if (!referenced[i]->exist(elem))
-                    throw new Bad_Column("Removing element: " + elem.toString() + " from column: " + name + "violates external reference: " + tableName + "(" + name + ")" + "<-->" + referenced[i]->tableName + "(" + referenced[i]->name + ")");
         for (int i = 0; i < data.size(); i++)
         {
             if (elem == *data[i].value)
@@ -84,12 +65,26 @@ namespace WellDoneDB
         }
     }
 
+    void Column::set(int index, Type* newData) {
+        if (this->type != newData->getType())
+            throw new Bad_Column("Cannot set a dataType: " + typeToString(newData->getType()) + "into a column of type: " + typeToString(this->type));
+        this->data[index].value = newData;
+    }
+
+   bool Column::set(Type* oldData, Type* newData) {
+            
+        if(this->type != newData->getType())
+            throw new Bad_Column("Cannot set a dataType: " + typeToString(newData->getType()) + "into a column of type: " + typeToString(this->type));
+        for (int i = 0; i < this->data.size(); i++)
+            if (*data[i].value == *oldData) {
+                data[i].value = newData;
+                return true;
+            }
+        return false;
+    }
+
     void Column::remove(int index, bool drop)
     {
-        if (referenced.size() > 0)
-            for (int i = 0; i < referenced.size(); i++)
-                if (!referenced[i]->exist(*data[index].value))
-                    throw new Bad_Column("Removing element: " + data[i].value->toString() + " from column: " + name + "violates external reference: " + tableName + "(" + name + ")" + "<-->" + referenced[i]->tableName + "(" + referenced[i]->name + ")");
         if (drop)
         {
             data.erase(data.begin() + index);
@@ -233,11 +228,11 @@ namespace WellDoneDB
         newSel.dataCompare = this->dataCompare;
         int i = 0, j = 0;
         while (i < this->positions.size() && j < sel.positions.size()) {
-            if (this->positions[i].key > sel.positions[j].key) {
+            if (this->positions[i].key < sel.positions[j].key) {
                 newSel.positions.push_back(this->col->get(this->positions[i].key));
                 i++;
             }
-            else if (this->positions[i].key < sel.positions[j].key) {
+            else if (this->positions[i].key > sel.positions[j].key) {
                 newSel.positions.push_back(this->col->get(sel.positions[j].key));
                 j++;
             }
@@ -250,15 +245,17 @@ namespace WellDoneDB
         while (i < this->positions.size()) {
             if (!this->exist(positions[i]))
                 this->positions.push_back(this->col->get(this->positions[i].key));
+            i++;
         }
         while (j < sel.positions.size()) {
             if (!this->exist(sel.positions[j]))
                 this->positions.push_back(this->col->get(sel.positions[j].key));
+            j++;
         }
         return newSel;
     }
 
-    VectorizedTable::VectorizedTable(std::string name, std::vector<Column*> cols) : name{ name } {
+    VectorizedTable::VectorizedTable(std::string name, std::vector<Column*> cols) : name{ name } , references{ nullptr } {
         if (!cols.empty()) {
             for (int i = 0; i < cols.size(); i++) {
                 columns.push_back(cols[i]);
@@ -285,7 +282,8 @@ namespace WellDoneDB
         }
         return max;
     }
-    void VectorizedTable::addRow(std::vector<Type*> data, std::vector<string> columnNames, bool check) {
+    void VectorizedTable::addRow(std::vector<Type*> data, std::vector<std::string> columnNames, bool check) {
+        
         if (data.size() != columnNames.size())
             throw new Bad_Table("vector of data and names of different sizes");
         for (int i = 0; i < data.size(); i++) {
@@ -311,39 +309,36 @@ namespace WellDoneDB
                     }
                 }
             }
-        }
-    }
-    
-    void VectorizedTable::removeRow(int index, bool drop) {
-        for (int i = 0; i < columns.size(); i++) {
-            if(!columns[i]->removable(index))
-                try {
-                columns[i]->remove(index,true);
+            if (this->references != nullptr) {
+                if(!references->tab->rowExist(this->getRow(this->getMaxSize() - 1,this->references->referenced))){
+                    this->removeRow(this->getMaxSize() - 1, true);
+                    std::string error("Error foreign key broken for: ");
+                    error += this->getName()+"(";
+                    for (int i = 0; i < this->references->reference.size(); i++) {
+                        error += this->references->reference[i] + ",";
+                    }
+                    error += ") references " + references->tab->getName();
+                    for (int i = 0; i < this->references->referenced.size(); i++) {
+                        error += this->references->referenced[i] + ",";
+                    }
+                    error += ")";
+                    throw new Bad_Table(error);
+                }
             }
-            catch(Column::Bad_Column exc){
-                throw new Bad_Table("Error in column: " + columns[i]->getName());
-            }
-        }
-        for (int i = 0; i < columns.size(); i++) {
-            columns[i]->remove(index, drop);
         }
     }
 
+    
+    void VectorizedTable::removeRow(int index, bool drop) {
+        for (int i = 0; i < this->columns.size(); i++) {
+            columns[i]->remove(index, drop);
+       }
+    }
+
     void VectorizedTable::removeRows(std::vector<int> indexes, bool drop) {
-        for (int i = 0; i < indexes.size(); i++) {
-            for (int j = 0; j < columns.size(); j++) {
-                if (!columns[j]->removable(indexes[i]))
-                    try {
-                    columns[j]->remove(indexes[i], true);
-                }
-                catch (Column::Bad_Column exc) {
-                    throw new Bad_Table("Error in column: " + columns[j]->getName());
-                }
-            }
-        }
-        for (int i = 0; i < indexes.size(); i++) {
-            for (int j = 0; j < columns.size(); j++) {
-                columns[j]->remove(i, drop);
+        for (int k = 0; k < indexes.size(); k++) {
+            for (int i = 0; i < this->columns.size(); i++) {
+                columns[i]->remove(indexes[k], drop);
             }
         }
     }
@@ -426,7 +421,7 @@ namespace WellDoneDB
         return newVec;
     }
 
-    Selection::Selection(Column& col, Type* low, Type* high) : condition{ Conditions::BETWEEN }, low{ low }, high{ high }, col{ &col } {
+    Selection::Selection(Column& col, Type* low, Type* high) : condition{ Conditions::BETWEEN }, low{ low }, high{ high }, col{ &col }, dataCompare{ nullptr } {
         for (int i = 0; i < col.getSize(); i++) {
             if (*col[i] <= *high && *col[i] >= *low)
                 this->positions.push_back(col.get(i));
@@ -441,16 +436,19 @@ namespace WellDoneDB
         }
         str += "\n\n";
         for (int i = 0; i < columnReferenceSize; i++) {
-            str += to_string(this->columns[0]->get(i).key) +" |";
+            str += std::to_string(this->columns[0]->get(i).key) +" |";
             for (int j = 0; j < this->columns.size(); j++) {
-                str += "|" + this->columns[j]->at(i)->toString();
+                if (!this->columns[j]->at(i)->isNull())
+                    str += "|" + this->columns[j]->at(i)->toString();
+                else
+                    str += "| NULL";
             }
             str += "\n";
         }
         return str;
     }
 
-    VectorizedTable VectorizedTable::select(Selection& sel) {
+    VectorizedTable VectorizedTable::select(Selection sel) {
         VectorizedTable newTab("Selection of:"+this->name);
         newTab.copy(*this);
         auto positions = sel.getPos();
@@ -459,5 +457,71 @@ namespace WellDoneDB
         }
         return newTab;
     }
+
+    std::vector<Type*> VectorizedTable::getRow(int index, std::vector<std::string> columns)
+    {
+       std::vector<Type*> vec;
+       for (int i = 0; i < columns.size(); i++) {
+           vec.push_back(this->at(i)->at(index));
+       }
+       return vec;
+    }
+
+    bool elemExist(Type* data, std::vector<Type*> container) {
+        for (int i = 0; i < container.size(); i++) {
+            if (*data == *container[i])
+                return true;
+        }
+        return false;
+    }
+
+    bool vectorSubEquals(std::vector<Type*> container, std::vector<Type*> container2) {
+        for (int i = 0; i < container.size(); i++) {
+            if (!elemExist(container[i], container2))
+                return false;
+        }
+        return true;
+    }
+
+    bool VectorizedTable::rowExist(std::vector<Type*> data, std::vector<std::string> cols)
+    {
+        for (int i = 0; i < this->getMaxSize(); i++) {
+            if (vectorSubEquals(data, this->getRow(i)))
+                return true;
+        }
+        return false;
+    }
+
+
+    bool VectorizedTable::rowExist(std::vector<Type*> data)
+    {
+        return rowExist(data,this->getColNames());
+    }
+
+    void VectorizedTable::setReference(Reference ref) {
+        if (this->references != nullptr)
+            this->references->tab->removeReferenced(this->name);
+        this->references = &ref;
+        ref.tab->addReferenced(ref);
+    }
+
+    void VectorizedTable::unsetReference() {
+        if(this->references != nullptr)
+            this->references->tab->removeReferenced(this->name);
+        this->references = nullptr;
+    }
+
+    void VectorizedTable::addReferenced(Reference ref) {
+        this->referenced.push_back(&ref);
+    }
+
+    void VectorizedTable::removeReferenced(std::string tableName) {
+        for (int i = 0; i < this->referenced.size(); i++) {
+            if (referenced[i]->tab->getName() == tableName)
+                referenced.erase(referenced.begin() + i);
+        }
+    }
+
+
 
 } // namespace WellDoneDB

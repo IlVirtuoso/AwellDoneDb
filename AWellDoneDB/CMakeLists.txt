@@ -7,7 +7,9 @@ enable_testing()
 
 add_executable(AWellDoneDB
 src/XmlParser.cpp
-include/XmlParser.hpp
+src/Table.iml.cpp
+src/Types.iml.cpp
+src/Database.iml.cpp
 main.cpp)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})

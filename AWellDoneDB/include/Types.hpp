@@ -1,4 +1,8 @@
 #pragma once
+#include <iostream>
+#include <vector>
+#include <string>
+#include <exception>
 namespace WellDoneDB
 {
     enum class Types
@@ -16,7 +20,7 @@ namespace WellDoneDB
     class Type
     {
     protected:
-        bool is_null;
+        bool is_null = false;
         Types type;
 
     public:
