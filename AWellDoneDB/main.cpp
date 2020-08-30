@@ -15,7 +15,7 @@ std::vector<Type*> generateInt(){
 vector<Type*> generateDate(){
     vector<Type*> dates;
     for(int i = 0 ; i < 1000; i++){
-        dates.push_back(new Date{rand()%28,rand()%12,rand()%4000});
+        dates.push_back(new Date{rand()%27 + 1,rand()%11 + 1,rand()%4000});
     }
     return dates;
 }
@@ -29,22 +29,15 @@ vector<Type*> generateTime(){
 }
 
 int main(int argc, char * argv[]){
-    VectorizedTable* t1 = new VectorizedTable("site");
-    t1->createColumn("Date", Types::DATE);
-    t1->createColumn("Time", Types::TIME);
-    VectorizedTable* t2 = new VectorizedTable("ids");
-    Database db("db");
-    t2->createColumn("Date", Types::DATE);
-    t2->createColumn("IDs", Types::INT);
-    auto dates = generateDate();
-    auto times = generateTime();
-    auto ints = generateInt();
+    Database db("hello za warudo!");
+    db.createTable("times");
+    db["times"]->createColumn("Time", Types::TIME);
+    db["times"]->createColumn("Dates", Types::DATE);
     for (int i = 0; i < 100; i++) {
-        t1->addRow({ dates[rand() % 100],times[rand() % 100] }, { "Date","Time" });
-        t2->addRow({ dates[rand() % 100], ints[rand() % 100] }, { "Date", "IDs" });
+        db["times"]->addRow({ generateTime()[0],generateDate()[0] },db["times"]->getColNames());
     }
-    Selection sel(*t1->operator[]("Date"), Conditions::LESSTHAN, new Date("20-11-1997",Date::DD_MM_YYYY));
-    Selection sel2(*t1->operator[]("Date"), Conditions::GREATHERTHAN, new Date("20-11-1997", Date::DD_MM_YYYY));
-    t1->removeRow(3, false);
-    cout << t1->toString() << endl;
-}
+    Selection sel(*(*db["times"])["Time"], Conditions::GREATEREQTHAN, new Time("10:02"));
+    Selection sel2(*(*db["times"])["Dates"], Conditions::LESSEQTHAN, new Date("20-11-1997", Date::DD_MM_YYYY));
+    Selection between(*(*db["times"])["Time"], new Time("10:02"), new Time("13:04"));
+    cout << db["times"]->project({ "Dates" })->select(between)->toString() << endl;
+} 

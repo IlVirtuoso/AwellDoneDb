@@ -43,6 +43,8 @@ namespace WellDoneDB
         leap = checkLeap(yy);
         if (dd == 29 && mm == 2 && !leap)
             throw new Bad_Date("29 february on a non leap year");
+        if(dd< 1 || mm < 1 || dd > 31 || mm > 12)
+            throw new Bad_Date("invalid Date");
     }
 
     Date::Date(int dd, int mm, int yy, int format) : format{format}, dd{dd}, mm{mm}, yy{yy}

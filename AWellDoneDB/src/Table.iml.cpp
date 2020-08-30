@@ -83,6 +83,41 @@ namespace WellDoneDB
         return false;
     }
 
+   void _typeQuickSort(std::vector<Pair<Type*, int>> arr, int left, int right) {
+       int i = left, j = right;
+       Type* tmp;
+       auto pivot = arr[(left + right) / 2].value;
+       while (i <= j) {
+           while (arr[i].value < pivot)
+               i++;
+           while (arr[j].value > pivot)
+               j--;
+           if (i <= j) {
+               tmp = arr[i].value;
+               arr[i].value = arr[j].value;
+               arr[j].value = tmp;
+               i++;
+               j--;
+           }
+       }
+       if (left < j)
+           _typeQuickSort(arr, left, j);
+       if (i < right)
+           _typeQuickSort(arr, i, right);
+   }
+
+
+   void Column::sort(bool desc) {
+       _typeQuickSort(this->data, 0, this->data.size() - 1);
+       if (desc) {
+           std::vector<Pair<Type*, int>> vec;
+           for (int i = 0; i < this->data.size(); i++) {
+               vec.push_back(this->data[this->data.size() - 1 - i]);
+           }
+           this->data = vec;
+       }
+   }
+
     void Column::remove(int index, bool drop)
     {
         if (drop)
@@ -170,7 +205,7 @@ namespace WellDoneDB
         Selection newSel;
         for (int i = 0; i < this->positions.size(); i++) {
             int check = this->positions[i].key;
-            if (check <= sel.positions.size()) {
+            if (check < sel.positions.size()) {
                 switch (sel.condition)
                 {
                 case Conditions::EQUAL:
@@ -429,6 +464,9 @@ namespace WellDoneDB
     }
 
     std::string VectorizedTable::toString() {
+        if (this->columns.empty()) {
+            return "VOID TABLE";
+        }
         std::string str("COLUMNS:");
         int columnReferenceSize = this->columns.at(0)->getSize();
         for (int i = 0; i < this->getColNum(); i++) {
@@ -448,12 +486,12 @@ namespace WellDoneDB
         return str;
     }
 
-    VectorizedTable VectorizedTable::select(Selection sel) {
-        VectorizedTable newTab("Selection of:"+this->name);
-        newTab.copy(*this);
+    Table * VectorizedTable::select(Selection& sel) {
+        VectorizedTable * newTab = new VectorizedTable("Selection of:"+this->name);
+        newTab->copy(*this);
         auto positions = sel.getPos();
         for (int i = 0; i < positions.size(); i++) {
-            newTab.addRow(this->getRow(positions[i]));
+            newTab->addRow(this->getRow(positions[i]));
         }
         return newTab;
     }
@@ -498,11 +536,11 @@ namespace WellDoneDB
         return rowExist(data,this->getColNames());
     }
 
-    void VectorizedTable::setReference(Reference ref) {
+    void VectorizedTable::setReference(Reference * ref) {
         if (this->references != nullptr)
             this->references->tab->removeReferenced(this->name);
-        this->references = &ref;
-        ref.tab->addReferenced(ref);
+        this->references = ref;
+        ref->tab->addReferenced(ref);
     }
 
     void VectorizedTable::unsetReference() {
@@ -511,8 +549,21 @@ namespace WellDoneDB
         this->references = nullptr;
     }
 
-    void VectorizedTable::addReferenced(Reference ref) {
-        this->referenced.push_back(&ref);
+    void VectorizedTable::addReferenced(Reference * ref) {
+        this->referenced.push_back(ref);
+    }
+
+    std::vector<Column*> VectorizedTable::getColumns(std::vector<std::string> colNames)
+    {
+        std::vector<Column*> ret;
+        for (int i = 0; i < this->columns.size(); i++) {
+            for (int k = 0; k < colNames.size(); k++)
+                if (colNames[k] == columns[i]->getName()) {
+                    ret.push_back(columns[i]);
+                    continue;
+                }
+        }
+        return ret;
     }
 
     void VectorizedTable::removeReferenced(std::string tableName) {
@@ -522,6 +573,5 @@ namespace WellDoneDB
         }
     }
 
-
-
+ 
 } // namespace WellDoneDB

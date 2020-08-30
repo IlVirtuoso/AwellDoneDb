@@ -49,6 +49,7 @@ namespace WellDoneDB
         std::string toString();
         std::string inline getName() { return this->name; }
         int inline getSize() { return this->data.size(); }
+        void sort(bool desc = false);
     };
 
     
@@ -91,6 +92,10 @@ namespace WellDoneDB
             std::string message;
             Bad_Table(std::string message) { std::cout << message << std::endl; }
         };
+        enum class TableType {
+            VECTORIZED
+            //HASMAP coming soon
+        };
         virtual void createColumn(std::string columnName, Types columnType, bool not_null = false, bool autoincrement = false, bool index = false) = 0;
         virtual void addRow(std::vector<Type*> data, std::vector<std::string> columnNames, bool check = true) = 0;
         virtual void removeRow(int index, bool drop = false) = 0;
@@ -108,10 +113,15 @@ namespace WellDoneDB
         virtual std::vector<Type*> operator[](int index) = 0;
         virtual std::string toString() = 0;
         virtual std::vector<std::string> getColNames() = 0;
-        virtual void setReference(Reference ref) = 0;
+        virtual void setReference(Reference * ref) = 0;
         virtual void unsetReference() = 0;
         virtual void removeReferenced(std::string TableName) = 0;
-        virtual void addReferenced(Reference ref) = 0;
+        virtual void addReferenced(Reference * ref) = 0;
+        virtual Table* select(Selection& sel) = 0;
+        virtual std::vector<Column*> getColumns() = 0;
+        virtual std::vector<Column*> getColumns(std::vector<std::string> columns) = 0;
+        virtual Table* project(std::vector<std::string> columns) = 0;
+        virtual TableType getTableType() = 0;
     };
 
     class VectorizedTable : public Table
@@ -137,21 +147,23 @@ namespace WellDoneDB
         std::vector<Type*> operator[](int index) override { return getRow(index); }
         std::string getName() { return this->name; }
         int getColNum() { return this->columns.size(); }
-        Column* at(int index) { return this->columns[index]; }
+        inline Column* at(int index) { return this->columns[index]; }
         VectorizedTable operator*(Table& table);
         void copy(Table& table) override;
         std::vector<std::string> getColNames() override;
         std::string toString() override;
-        VectorizedTable select(Selection sel);
+        Table * select(Selection& sel) override;
         std::vector<Type*> getRow(int index, std::vector<std::string> columns);
         bool rowExist(std::vector<Type*> data, std::vector<std::string> columns);
         bool rowExist(std::vector<Type*> data);
-        void setReference(Reference ref);
+        void setReference(Reference * ref);
         void unsetReference();
         void removeReferenced(std::string TableName);
-        void addReferenced(Reference ref);
-        
-
+        void addReferenced(Reference * ref);
+        inline TableType getTableType() { return Table::TableType::VECTORIZED; }
+        inline std::vector<Column*> getColumns() { return this->columns; }
+        inline std::vector<Column*> getColumns(std::vector<std::string> colNames);
+        inline Table* project(std::vector<std::string> columns) { return new VectorizedTable("projection of: " + this->name, this->getColumns(columns)); }
     };
     
 
