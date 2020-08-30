@@ -39,5 +39,5 @@ int main(int argc, char * argv[]){
     Selection sel(*(*db["times"])["Time"], Conditions::GREATEREQTHAN, new Time("10:02"));
     Selection sel2(*(*db["times"])["Dates"], Conditions::LESSEQTHAN, new Date("20-11-1997", Date::DD_MM_YYYY));
     Selection between(*(*db["times"])["Time"], new Time("10:02"), new Time("13:04"));
-    cout << db["times"]->project({ "Dates" })->select(between)->toString() << endl;
+    cout << db["times"]->sort()->toString() << endl;
 } 

@@ -1,5 +1,6 @@
-#pragma once
 #include "../include/Types.hpp"
+#include <cmath>
+#include <string.h>
 namespace WellDoneDB
 {
     bool checkLeap(int yy)

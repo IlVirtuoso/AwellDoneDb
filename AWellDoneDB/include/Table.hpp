@@ -50,6 +50,7 @@ namespace WellDoneDB
         std::string inline getName() { return this->name; }
         int inline getSize() { return this->data.size(); }
         void sort(bool desc = false);
+        void order(std::vector<int> orderVector);
     };
 
     
@@ -122,6 +123,8 @@ namespace WellDoneDB
         virtual std::vector<Column*> getColumns(std::vector<std::string> columns) = 0;
         virtual Table* project(std::vector<std::string> columns) = 0;
         virtual TableType getTableType() = 0;
+        virtual Table * sort(std::string columnName,bool desc = false) = 0;
+        virtual void operator>>(Table* table) = 0;
     };
 
     class VectorizedTable : public Table
@@ -162,8 +165,10 @@ namespace WellDoneDB
         void addReferenced(Reference * ref);
         inline TableType getTableType() { return Table::TableType::VECTORIZED; }
         inline std::vector<Column*> getColumns() { return this->columns; }
-        inline std::vector<Column*> getColumns(std::vector<std::string> colNames);
+        std::vector<Column*> getColumns(std::vector<std::string> colNames);
         inline Table* project(std::vector<std::string> columns) { return new VectorizedTable("projection of: " + this->name, this->getColumns(columns)); }
+        Table* sort(std::string columnName ,bool desc = false);
+        void operator>>(Table* table);
     };
     
 

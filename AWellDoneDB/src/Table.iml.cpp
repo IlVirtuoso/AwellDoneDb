@@ -83,6 +83,15 @@ namespace WellDoneDB
         return false;
     }
 
+    /**
+     * 
+     * @TODO correggere il metodo affinché le posizioni vengnao mantenute  
+     * @note   
+     * @param  arr: 
+     * @param  left: 
+     * @param  right: 
+     * @retval None
+     */
    void _typeQuickSort(std::vector<Pair<Type*, int>> arr, int left, int right) {
        int i = left, j = right;
        Type* tmp;
@@ -165,6 +174,11 @@ namespace WellDoneDB
             pos.push_back(data[i].key);
         }
         return pos;
+    }
+
+
+    void Column::order(std::vector<int> order){
+
     }
 
     Selection::Selection(Column& col, Conditions condition, Type* dataCompare) : condition{ condition }, dataCompare{ dataCompare }, col{ &col } {
@@ -571,6 +585,20 @@ namespace WellDoneDB
             if (referenced[i]->tab->getName() == tableName)
                 referenced.erase(referenced.begin() + i);
         }
+    }
+
+    void VectorizedTable::operator>>(Table* table){
+        table->copy(*this);
+        for(int i = 0 ; i < this->columns[0]->getSize(); i++){
+            table->addRow(this->getRow(i),this->getColNames(),false);
+        }
+    }
+
+    Table* VectorizedTable::sort(std::string columnName,bool desc){
+        VectorizedTable* tab = new VectorizedTable(this->name);
+        *this >> tab;
+        (*tab)[columnName]->sort();
+
     }
 
  
