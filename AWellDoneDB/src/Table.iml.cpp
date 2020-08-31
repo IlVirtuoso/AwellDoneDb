@@ -1,8 +1,10 @@
 #pragma once
 #include "../include/Table.hpp"
+#include <fstream>
+#include "../include/XmlParser.hpp"
 namespace WellDoneDB
 {
-    Column::Column(std::string name, std::string tableName, Types type, std::vector<Type *> elements, bool not_null, bool index, bool autoincrement) : not_null{not_null}, index{index}, autoincrement{autoincrement}, tableName{tableName}, name{name}, type{type}
+    Column::Column(std::string name, std::string tableName, Types type, std::vector<Type*> elements, bool not_null, bool index, bool autoincrement) : not_null{ not_null }, index{ index }, autoincrement{ autoincrement }, tableName{ tableName }, name{ name }, type{ type }
     {
         if (autoincrement && type != Types::INT)
             throw new Bad_Column("cannot declare autoincrement column " + name + "of type not INT");
@@ -10,12 +12,12 @@ namespace WellDoneDB
         {
             for (int i = 0; i < elements.size(); i++)
             {
-                data.push_back(Pair<Type *, int>{elements[i], i});
+                data.push_back(Pair<Type*, int>{elements[i], i});
             }
         }
     }
 
-    void Column::add(Type &elem)
+    void Column::add(Type& elem)
     {
         if (not_null)
         {
@@ -35,17 +37,17 @@ namespace WellDoneDB
             throw new Bad_Column("Adding element of type: " + typeToString(elem.getType()) + "to a column of type: " + typeToString(type));
         if (data.empty())
         {
-            data.push_back(Pair<Type *, int>{&elem, 0});
+            data.push_back(Pair<Type*, int>{&elem, 0});
         }
         else
         {
-            data.push_back(Pair<Type *, int>{&elem, data[data.size() - 1].key + 1});
+            data.push_back(Pair<Type*, int>{&elem, data[data.size() - 1].key + 1});
         }
     }
 
-    void Column::add(Type *elem) { add(*elem); }
+    void Column::add(Type* elem) { add(*elem); }
 
-    void Column::remove(Type &elem, bool drop)
+    void Column::remove(Type& elem, bool drop)
     {
         for (int i = 0; i < data.size(); i++)
         {
@@ -71,9 +73,9 @@ namespace WellDoneDB
         this->data[index].value = newData;
     }
 
-   bool Column::set(Type* oldData, Type* newData) {
-            
-        if(this->type != newData->getType())
+    bool Column::set(Type* oldData, Type* newData) {
+
+        if (this->type != newData->getType())
             throw new Bad_Column("Cannot set a dataType: " + typeToString(newData->getType()) + "into a column of type: " + typeToString(this->type));
         for (int i = 0; i < this->data.size(); i++)
             if (*data[i].value == *oldData) {
@@ -83,49 +85,41 @@ namespace WellDoneDB
         return false;
     }
 
-    /**
-     * 
-     * @TODO correggere il metodo affinché le posizioni vengnao mantenute  
-     * @note   
-     * @param  arr: 
-     * @param  left: 
-     * @param  right: 
-     * @retval None
-     */
-   void _typeQuickSort(std::vector<Pair<Type*, int>> arr, int left, int right) {
-       int i = left, j = right;
-       Type* tmp;
-       auto pivot = arr[(left + right) / 2].value;
-       while (i <= j) {
-           while (arr[i].value < pivot)
-               i++;
-           while (arr[j].value > pivot)
-               j--;
-           if (i <= j) {
-               tmp = arr[i].value;
-               arr[i].value = arr[j].value;
-               arr[j].value = tmp;
-               i++;
-               j--;
-           }
-       }
-       if (left < j)
-           _typeQuickSort(arr, left, j);
-       if (i < right)
-           _typeQuickSort(arr, i, right);
-   }
+
+    void Column::_typeQuickSort(int left, int right) {
+        int i = left, j = right;
+        Pair<Type*, int> tmp{ nullptr, 0 };
+        auto pivot = this->data[(left + right) / 2].value;
+        while (i <= j) {
+            while (*this->data[i].value < *pivot)
+                i++;
+            while (*this->data[j].value > * pivot)
+                j--;
+            if (i <= j) {
+                tmp = this->data[i];
+                this->data[i] = this->data[j];
+                this->data[j] = tmp;
+                i++;
+                j--;
+            }
+        }
+        if (left < j)
+            _typeQuickSort(left, j);
+        if (i < right)
+            _typeQuickSort(i, right);
+    }
 
 
-   void Column::sort(bool desc) {
-       _typeQuickSort(this->data, 0, this->data.size() - 1);
-       if (desc) {
-           std::vector<Pair<Type*, int>> vec;
-           for (int i = 0; i < this->data.size(); i++) {
-               vec.push_back(this->data[this->data.size() - 1 - i]);
-           }
-           this->data = vec;
-       }
-   }
+    void Column::sort(bool desc) {
+        _typeQuickSort(0, this->data.size() - 1);
+        if (desc) {
+            std::vector<Pair<Type*, int>> vec;
+            for (int i = 0; i < this->data.size(); i++) {
+                vec.push_back(this->data[this->data.size() - 1 - i]);
+            }
+            this->data = vec;
+        }
+    }
 
     void Column::remove(int index, bool drop)
     {
@@ -141,15 +135,15 @@ namespace WellDoneDB
         }
     }
 
-    void Column::remove(Type *elem, bool drop) { remove(*elem, drop); }
+    void Column::remove(Type* elem, bool drop) { remove(*elem, drop); }
 
-    Type *Column::at(int index) { return data[index].value; }
-    Type *Column::operator[](int index) { return data[index].value; }
-
-
+    Type* Column::at(int index) { return data[index].value; }
+    Type* Column::operator[](int index) { return data[index].value; }
 
 
-    bool Column::exist(Type &elem)
+
+
+    bool Column::exist(Type& elem)
     {
         for (int i = 0; i < data.size(); i++)
             if (*data[i].value == elem)
@@ -176,9 +170,12 @@ namespace WellDoneDB
         return pos;
     }
 
-
-    void Column::order(std::vector<int> order){
-
+    void Column::order(std::vector<int> order) {
+        std::vector<Pair<Type*, int>> newData;
+        for (int i = 0; i < order.size(); i++) {
+            newData.push_back(this->data[order[i]]);
+        }
+        this->data.swap(newData);
     }
 
     Selection::Selection(Column& col, Conditions condition, Type* dataCompare) : condition{ condition }, dataCompare{ dataCompare }, col{ &col } {
@@ -194,7 +191,7 @@ namespace WellDoneDB
                     positions.push_back(col.get(i));
                 break;
             case WellDoneDB::Conditions::GREATHERTHAN:
-                if (*col[i] > *dataCompare)
+                if (*col[i] > * dataCompare)
                     positions.push_back(col.get(i));
                 break;
             case WellDoneDB::Conditions::LESSEQTHAN:
@@ -232,7 +229,7 @@ namespace WellDoneDB
                         newSel.positions.push_back(this->positions[check]);
                     break;
                 case Conditions::GREATHERTHAN:
-                    if (*sel.positions[check].value > *sel.dataCompare)
+                    if (*sel.positions[check].value > * sel.dataCompare)
                         newSel.positions.push_back(this->positions[check]);
                     break;
 
@@ -304,7 +301,7 @@ namespace WellDoneDB
         return newSel;
     }
 
-    VectorizedTable::VectorizedTable(std::string name, std::vector<Column*> cols) : name{ name } , references{ nullptr } {
+    VectorizedTable::VectorizedTable(std::string name, std::vector<Column*> cols) : name{ name }, references{ nullptr } {
         if (!cols.empty()) {
             for (int i = 0; i < cols.size(); i++) {
                 columns.push_back(cols[i]);
@@ -332,7 +329,7 @@ namespace WellDoneDB
         return max;
     }
     void VectorizedTable::addRow(std::vector<Type*> data, std::vector<std::string> columnNames, bool check) {
-        
+
         if (data.size() != columnNames.size())
             throw new Bad_Table("vector of data and names of different sizes");
         for (int i = 0; i < data.size(); i++) {
@@ -359,10 +356,10 @@ namespace WellDoneDB
                 }
             }
             if (this->references != nullptr) {
-                if(!references->tab->rowExist(this->getRow(this->getMaxSize() - 1,this->references->referenced))){
+                if (!references->tab->rowExist(this->getRow(this->getMaxSize() - 1, this->references->referenced))) {
                     this->removeRow(this->getMaxSize() - 1, true);
                     std::string error("Error foreign key broken for: ");
-                    error += this->getName()+"(";
+                    error += this->getName() + "(";
                     for (int i = 0; i < this->references->reference.size(); i++) {
                         error += this->references->reference[i] + ",";
                     }
@@ -377,11 +374,11 @@ namespace WellDoneDB
         }
     }
 
-    
+
     void VectorizedTable::removeRow(int index, bool drop) {
         for (int i = 0; i < this->columns.size(); i++) {
             columns[i]->remove(index, drop);
-       }
+        }
     }
 
     void VectorizedTable::removeRows(std::vector<int> indexes, bool drop) {
@@ -417,7 +414,7 @@ namespace WellDoneDB
         }
     }
 
-    std::vector<Type*> VectorizedTable::getRow(int index){
+    std::vector<Type*> VectorizedTable::getRow(int index) {
         std::vector<Type*> vec;
         for (int i = 0; i < this->columns.size(); i++) {
             vec.push_back(this->columns[i]->at(index));
@@ -438,7 +435,7 @@ namespace WellDoneDB
         }
         return vec;
     }
-    
+
     VectorizedTable VectorizedTable::operator*(Table& table) {
         VectorizedTable tab("X");
         tab.copy(*this);
@@ -455,7 +452,7 @@ namespace WellDoneDB
         int tableColSizeReference = table.at(0)->getSize();
         for (int i = 0; i < thisColSizeReference; i++) {
             for (int j = 0; j < tableColSizeReference; j++) {
-                tab.addRow(this->getRow(i), thisreferences,false);
+                tab.addRow(this->getRow(i), thisreferences, false);
                 tab.addRow(table.getRow(j), tablereferences, false);
             }
         }
@@ -474,7 +471,7 @@ namespace WellDoneDB
         for (int i = 0; i < col.getSize(); i++) {
             if (*col[i] <= *high && *col[i] >= *low)
                 this->positions.push_back(col.get(i));
-        }  
+        }
     }
 
     std::string VectorizedTable::toString() {
@@ -484,11 +481,11 @@ namespace WellDoneDB
         std::string str("COLUMNS:");
         int columnReferenceSize = this->columns.at(0)->getSize();
         for (int i = 0; i < this->getColNum(); i++) {
-            str = str + "|" +this->getColNames().at(i)+"("+typeToString(this->columns[i]->getType()) + ")";
+            str = str + "|" + this->getColNames().at(i) + "(" + typeToString(this->columns[i]->getType()) + ")";
         }
         str += "\n\n";
         for (int i = 0; i < columnReferenceSize; i++) {
-            str += std::to_string(this->columns[0]->get(i).key) +" |";
+            str += std::to_string(this->columns[0]->get(i).key) + " |";
             for (int j = 0; j < this->columns.size(); j++) {
                 if (!this->columns[j]->at(i)->isNull())
                     str += "|" + this->columns[j]->at(i)->toString();
@@ -500,8 +497,8 @@ namespace WellDoneDB
         return str;
     }
 
-    Table * VectorizedTable::select(Selection& sel) {
-        VectorizedTable * newTab = new VectorizedTable("Selection of:"+this->name);
+    Table* VectorizedTable::select(Selection& sel) {
+        VectorizedTable* newTab = new VectorizedTable("Selection of:" + this->name);
         newTab->copy(*this);
         auto positions = sel.getPos();
         for (int i = 0; i < positions.size(); i++) {
@@ -512,11 +509,11 @@ namespace WellDoneDB
 
     std::vector<Type*> VectorizedTable::getRow(int index, std::vector<std::string> columns)
     {
-       std::vector<Type*> vec;
-       for (int i = 0; i < columns.size(); i++) {
-           vec.push_back(this->at(i)->at(index));
-       }
-       return vec;
+        std::vector<Type*> vec;
+        for (int i = 0; i < columns.size(); i++) {
+            vec.push_back(this->at(i)->at(index));
+        }
+        return vec;
     }
 
     bool elemExist(Type* data, std::vector<Type*> container) {
@@ -547,10 +544,10 @@ namespace WellDoneDB
 
     bool VectorizedTable::rowExist(std::vector<Type*> data)
     {
-        return rowExist(data,this->getColNames());
+        return rowExist(data, this->getColNames());
     }
 
-    void VectorizedTable::setReference(Reference * ref) {
+    void VectorizedTable::setReference(Reference* ref) {
         if (this->references != nullptr)
             this->references->tab->removeReferenced(this->name);
         this->references = ref;
@@ -558,12 +555,12 @@ namespace WellDoneDB
     }
 
     void VectorizedTable::unsetReference() {
-        if(this->references != nullptr)
+        if (this->references != nullptr)
             this->references->tab->removeReferenced(this->name);
         this->references = nullptr;
     }
 
-    void VectorizedTable::addReferenced(Reference * ref) {
+    void VectorizedTable::addReferenced(Reference* ref) {
         this->referenced.push_back(ref);
     }
 
@@ -587,19 +584,162 @@ namespace WellDoneDB
         }
     }
 
-    void VectorizedTable::operator>>(Table* table){
+    void VectorizedTable::operator>>(Table* table) {
         table->copy(*this);
-        for(int i = 0 ; i < this->columns[0]->getSize(); i++){
-            table->addRow(this->getRow(i),this->getColNames(),false);
+        for (int i = 0; i < this->columns[0]->getSize(); i++) {
+            for (int j = 0; j < this->columns.size(); j++) {
+                table->at(j)->add(this->at(j)->at(i));
+            }
         }
     }
 
-    Table* VectorizedTable::sort(std::string columnName,bool desc){
+    Table* VectorizedTable::sort(std::string columnName, bool desc) {
         VectorizedTable* tab = new VectorizedTable(this->name);
         *this >> tab;
-        (*tab)[columnName]->sort();
-
+        (*tab)[tab->getName() + "." + columnName]->sort(desc);
+        for (int i = 0; i < this->columns.size(); i++) {
+            tab->columns[i]->order((*tab)[tab->getName() + "." + columnName]->getPositions());
+        }
+        return tab;
     }
 
+
+    std::string Column::toXml() {
+        std::string xml("<column>\n");
+        xml += "<name>" + this->name + "</name>\n";
+        xml += "<type>" + typeToString(this->type) + "</type>\n";
+        xml += "<tableName>" + this->tableName + "</tableName>\n";
+        xml += "<autoincrement>" + std::to_string(this->autoincrement) + "</autoincrement>\n";
+        xml += "<notNull>" + std::to_string(this->not_null) + "</notNull>\n";
+        xml += "<index>" + std::to_string(this->index) + "</index>\n";
+        xml += "<container>\n";
+        for (int i = 0; i < this->data.size(); i++) {
+            xml += "<position>" + std::to_string(this->data[i].key) + "</position>\n";
+            xml += "<data>" + this->data[i].value->toString() + "</data>\n";
+        }
+        xml += "</container>\n";
+        xml += "</column>\n";
+        return xml;
+    }
+
+    std::string tableTypeToString(Table::TableType type) {
+        switch (type)
+        {
+        case WellDoneDB::Table::TableType::VECTORIZED:
+            return std::string("VECTORIZED");
+            break;
+        default:
+            break;
+        }
+    }
+
+    Types stringToType(std::string type) {
+        if (type == "INT")
+            return Types::INT;
+        else if (type == "FLOAT")
+            return Types::FLOAT;
+        else if (type == "DATE")
+            return Types::DATE;
+        else if (type == "TIME")
+            return Types::TIME;
+        else if (type == "TEXT")
+            return Types::TEXT;
+        else if (type == "NULLED")
+            return Types::NULLED;
+    }
+
+    std::string VectorizedTable::toXml() {
+        std::string xml("<table>\n");
+        xml += "<name>" + this->name + "</name>\n";
+        xml += "<type>" + tableTypeToString(this->getTableType()) + "</type>\n";
+        xml += "<columns>\n";
+        for (int i = 0; i < this->columns.size(); i++) {
+            xml += columns[i]->toXml();
+        }
+        xml += "</columns>\n";
+        xml += "</table>\n";
+        return xml;
+    }
+
+
+    bool stringToBool(std::string val) {
+        if (val == "false")
+            return false;
+        return true;
+    }
+
+    Type * stringToType(std::string value, Types type) {
+        if (value == "NULL")
+            return new Null();
+        switch (type)
+        {
+        case WellDoneDB::Types::NULLED:
+            return new Null();
+        case WellDoneDB::Types::INT:
+            return new Integer(atoi(value.c_str()));
+        case WellDoneDB::Types::CHAR:
+            return new Char(value[0]);
+        case WellDoneDB::Types::TEXT:
+            return new Text(value);
+        case WellDoneDB::Types::FLOAT:
+            return new Float(atof(value.c_str()));
+        case WellDoneDB::Types::DATE:
+            return new Date(value,Date::DD_MM_YYYY);
+        case WellDoneDB::Types::TIME:
+            return new Time(value);
+        default:
+            break;
+        }
+    }
+
+    void VectorizedTable::loadXml()
+    {
+        std::ifstream file(this->name + ".table");
+        std::string xml;
+        while (file.good())
+            xml += file.get();
+        XmlParser parser(xml);
+        auto token = parser.begin();
+        while (token != parser.end()) {
+            if (token->tag == "columns") {
+                token++;
+                std::string name, type, tableName;
+                bool auto_increment = false, index = false, not_null = false;
+                std::vector<Type*> data;
+                while (token->tag != "columns") {
+                    if (token->tag == "column") {
+                        if (!name.empty())
+                            this->columns.push_back(new Column(name, tableName, stringToType(type), data, not_null, index, auto_increment));
+                        name.clear();
+                        type.clear();
+                        tableName.clear();
+                        data.clear();
+                    }
+                    else if (token->tag == "name")
+                        name = token->value;
+                    else if (token->tag == "type")
+                        type = token->value;
+                    else if (token->tag == "tableName")
+                        tableName = token->value;
+                    else if (token->tag == "autoincrement")
+                        auto_increment = atoi(token->value.c_str());
+                    else if (token->tag == "notNull")
+                        not_null = atoi(token->value.c_str());
+                    else if (token->tag == "index")
+                        index = atoi(token->value.c_str());
+                    else if (token->tag == "container") {
+                        token++;
+                        while (token->tag != "container") {
+                            if (token->tag == "data")
+                                data.push_back(stringToType(token->value, stringToType(type)));
+                            token++;
+                        }
+                    }
+                    token++;
+                }
+            }
+            token++;
+        }
+    }
  
 } // namespace WellDoneDB

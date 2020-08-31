@@ -3,7 +3,7 @@
 #include<vector>
 #include<iostream>
 
-using namespace std;
+
 
 
 enum class TokenID {
@@ -13,20 +13,27 @@ enum class TokenID {
 
 class Token {
 public:
-	string tag;
-	string value;
-	TokenID id;
-	Token(string Tag, string Value, TokenID id);
+	std::string tag;
+	std::string value;
+	explicit Token(std::string Tag, std::string Value) : tag{Tag},value{Value}{}
 };
 
 class XmlParser
 {
-	vector<Token> tokens;
-	string xmlString;
-	bool checkCloseTag(string closeTag);
+	std::vector<Token> tokens;
+	std::string xmlString;
+	bool checkCloseTag(std::string closeTag);
 public:
-	XmlParser(string xmlString);
-	bool tagExists(string tag);
+	class Bad_Parser {
+	public:
+		std::string message;
+		Bad_Parser(std::string message) { std::cout << message << std::endl; }
+	};
+	auto begin() { return this->tokens.begin(); }
+	std::vector<Token>::iterator end() { return this->tokens.end(); }
+
+	explicit XmlParser(std::string xmlString);
+	bool tagExists(std::string tag);
 	int size();
 	Token getToken(int index);
 };

@@ -22,6 +22,7 @@ namespace WellDoneDB
         Types type;
         std::string name;
         std::string tableName;
+        void _typeQuickSort(int left, int right);
 
     public:
         class Bad_Column 
@@ -51,6 +52,7 @@ namespace WellDoneDB
         int inline getSize() { return this->data.size(); }
         void sort(bool desc = false);
         void order(std::vector<int> orderVector);
+        std::string toXml();
     };
 
     
@@ -125,6 +127,8 @@ namespace WellDoneDB
         virtual TableType getTableType() = 0;
         virtual Table * sort(std::string columnName,bool desc = false) = 0;
         virtual void operator>>(Table* table) = 0;
+        virtual std::string toXml() = 0;
+        virtual void loadXml() = 0;
     };
 
     class VectorizedTable : public Table
@@ -169,7 +173,10 @@ namespace WellDoneDB
         inline Table* project(std::vector<std::string> columns) { return new VectorizedTable("projection of: " + this->name, this->getColumns(columns)); }
         Table* sort(std::string columnName ,bool desc = false);
         void operator>>(Table* table);
+        std::string toXml();
+        void loadXml();
     };
+    
     
 
 } // namespace WellDoneDB

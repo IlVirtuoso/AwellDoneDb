@@ -1,5 +1,7 @@
 #include <iostream>
 #include "include/Database.hpp"
+#include "include/XmlParser.hpp"
+#include <fstream>
 
 using namespace std;
 using namespace WellDoneDB;
@@ -29,15 +31,9 @@ vector<Type*> generateTime(){
 }
 
 int main(int argc, char * argv[]){
-    Database db("hello za warudo!");
-    db.createTable("times");
-    db["times"]->createColumn("Time", Types::TIME);
-    db["times"]->createColumn("Dates", Types::DATE);
-    for (int i = 0; i < 100; i++) {
-        db["times"]->addRow({ generateTime()[0],generateDate()[0] },db["times"]->getColNames());
-    }
-    Selection sel(*(*db["times"])["Time"], Conditions::GREATEREQTHAN, new Time("10:02"));
-    Selection sel2(*(*db["times"])["Dates"], Conditions::LESSEQTHAN, new Date("20-11-1997", Date::DD_MM_YYYY));
-    Selection between(*(*db["times"])["Time"], new Time("10:02"), new Time("13:04"));
-    cout << db["times"]->sort()->toString() << endl;
+    Database db("times");
+    db.loadXml();
+    cout<< db["IDs"]->toString()<<endl;
+    
+
 } 

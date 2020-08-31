@@ -1,45 +1,77 @@
 #include "../include/XmlParser.hpp"
 
+using namespace std; 
 XmlParser::XmlParser(string xmlString) {
-	string buffer;
-	string valueBuffer;
-	string closeTagBuffer;
-	this->xmlString = xmlString;
-	for (int i = 0; i < xmlString.size(); i++) {
-		if (xmlString[i++] == '<') {
-			while (xmlString[i] != '>') {
-				buffer.insert(buffer.end(), xmlString[i++]);
-			}
-			if (xmlString[++i] == '\n') {
-				this->tokens.insert(this->tokens.end(),Token(buffer,"",TokenID::GROUPTAG));
-				buffer.erase();
+	string tag;
+	string closeTag;
+	string value;
+	auto c = xmlString.begin();
+	while (c != xmlString.end()) {
+		switch (*c)
+		{
+		case '<':
+			c++;
+			if (*c == '/') {
+				c++;
+				while (*c != '>') {
+					closeTag += *c;
+					c++;
+				}
+				c++;
 			}
 			else {
-				while (xmlString[i] != '<')
-					valueBuffer.insert(valueBuffer.end(), xmlString[i++]);
-				i++;
-				while (xmlString[i] != '>') {
-					closeTagBuffer.insert(closeTagBuffer.end(), xmlString[i++]);
+				while (*c != '>') {
+					tag += *c;
+					c++;
 				}
-				if (!closeTagBuffer.compare(buffer) == 0)
-					if (!this->checkCloseTag(closeTagBuffer))
-						return;
-				this->tokens.insert(this->tokens.end(), Token(buffer, valueBuffer, TokenID::VALUETAG));
-				buffer.erase();
-				valueBuffer.erase();
-				closeTagBuffer.erase();
-				i++;
+				c++;
 			}
-		}
-		else {
+			break;
+
+		case '\n':
+			if (!tag.empty() && !closeTag.empty()) {
+				if (!(tag == closeTag))
+					throw new Bad_Parser("Tag: " + tag + " don't match with close tag: " + closeTag);
+				this->tokens.push_back(Token(tag, value));
+				tag.clear();
+				closeTag.clear();
+				value.clear();	
+			}
+			else if (!closeTag.empty() && tag.empty()) {
+				if (!checkCloseTag(closeTag))
+					throw new Bad_Parser("CloseTag: " + closeTag + " don't match with any open tag");
+				this->tokens.push_back(Token(closeTag, value));
+				tag.clear();
+				closeTag.clear();
+				value.clear();
+			}
+			else if (closeTag.empty() && !tag.empty()) {
+				this->tokens.push_back(Token(tag, value));
+				tag.clear();
+				closeTag.clear();
+				value.clear();
+			}
+			c++;
+			break;
+
+		case EOF:
 			return;
+		default:
+			while (*c != '<') {
+				if (*c == EOF)
+					throw new Bad_Parser("Error reached end of while in unexpected way");
+				value += *c;
+				c++;
+			}
+			break;
 		}
 	}
+	
 }
 
 bool XmlParser::checkCloseTag(string closeTag) {
 	for (int i = 0; i < this->tokens.size(); i++) {
-		if (this->tokens.at(i).tag.compare(closeTag) == 1)
+		if (this->tokens.at(i).tag.compare(closeTag) == 0)
 			return true;
 	}
 	return false;
@@ -51,13 +83,6 @@ bool XmlParser::tagExists(string tag) {
 			return true;
 	}
 	return false;
-}
-
-Token::Token(string tag, string Value, TokenID id)
-{
-	this->tag = tag;
-	this->value = Value;
-	this->id = id;
 }
 
 int XmlParser::size() {
