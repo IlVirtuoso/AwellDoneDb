@@ -6,21 +6,16 @@
 
 
 
-enum class TokenID {
-	GROUPTAG,
-	VALUETAG
-};
 
-class Token {
-public:
+struct XmlToken {
 	std::string tag;
 	std::string value;
-	explicit Token(std::string Tag, std::string Value) : tag{Tag},value{Value}{}
+	explicit XmlToken(std::string Tag, std::string Value) : tag{Tag},value{Value}{}
 };
 
 class XmlParser
 {
-	std::vector<Token> tokens;
+	std::vector<XmlToken> tokens;
 	std::string xmlString;
 	bool checkCloseTag(std::string closeTag);
 public:
@@ -30,12 +25,12 @@ public:
 		Bad_Parser(std::string message) { std::cout << message << std::endl; }
 	};
 	auto begin() { return this->tokens.begin(); }
-	std::vector<Token>::iterator end() { return this->tokens.end(); }
+	std::vector<XmlToken>::iterator end() { return this->tokens.end(); }
 
 	explicit XmlParser(std::string xmlString);
 	bool tagExists(std::string tag);
 	int size();
-	Token getToken(int index);
+	XmlToken getToken(int index);
 };
 
 

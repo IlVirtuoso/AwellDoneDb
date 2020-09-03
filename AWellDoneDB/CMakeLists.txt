@@ -10,7 +10,8 @@ src/XmlParser.cpp
 src/Table.iml.cpp
 src/Types.iml.cpp
 src/Database.iml.cpp
-main.cpp)
+main.cpp 
+src/SQLParser.iml.cpp)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})

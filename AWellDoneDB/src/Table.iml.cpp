@@ -646,7 +646,9 @@ namespace WellDoneDB
             return Types::TEXT;
         else if (type == "NULLED")
             return Types::NULLED;
+        else return Types::NOTVALID;
     }
+
 
     std::string VectorizedTable::toXml() {
         std::string xml("<table>\n");
@@ -740,6 +742,27 @@ namespace WellDoneDB
             }
             token++;
         }
+    }
+
+    void VectorizedTable::update(std::vector<int> positions, std::string columnName, Type* newData)
+    {
+        if (positions.size() > (*this)[columnName]->getSize())
+            throw new Bad_Table("too much positions for this column");
+        for (int i = 0; i < positions.size(); i++)
+            if (positions[i] > (*this)[columnName]->getSize())
+                throw new Bad_Table("invalid position specified, row: " + std::to_string(i) + " in column: " + this->name + " with max rows: " +
+                    std::to_string((*this)[columnName]->getSize()));
+        for (int i = 0; i < positions.size(); i++) {
+            (*this)[columnName]->set(positions[i], newData);
+        }
+    }
+
+    void VectorizedTable::truncate()
+    {
+        std::vector<int> positions;
+        for (int i = 0; i < this->getMaxSize(); i++)
+            positions.push_back(i);
+        this->removeRows(positions, true);
     }
  
 } // namespace WellDoneDB

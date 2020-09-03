@@ -1,6 +1,7 @@
 #include <iostream>
 #include "include/Database.hpp"
 #include "include/XmlParser.hpp"
+#include "include/SQLParser.hpp"
 #include <fstream>
 
 using namespace std;
@@ -31,9 +32,6 @@ vector<Type*> generateTime(){
 }
 
 int main(int argc, char * argv[]){
-    Database db("times");
-    db.loadXml();
-    cout<< db["IDs"]->toString()<<endl;
-    
 
+    
 } 

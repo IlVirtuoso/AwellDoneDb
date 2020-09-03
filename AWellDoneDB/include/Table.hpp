@@ -25,7 +25,7 @@ namespace WellDoneDB
         void _typeQuickSort(int left, int right);
 
     public:
-        class Bad_Column 
+        class Bad_Column : std::exception
         {
         public:
             std::string message;
@@ -70,7 +70,6 @@ namespace WellDoneDB
         Selection operator||(Selection& sel);
         Selection operator&&(Selection& sel);
         std::vector<int> getPos();
-        
     };
 
 
@@ -89,7 +88,7 @@ namespace WellDoneDB
             explicit Reference(Table* tab, std::vector<std::string> referenceCols, std::vector<std::string> referencedCols) :
                 tab{ tab }, reference{ referenceCols }, referenced{ referencedCols }{}
         };
-        class Bad_Table
+        class Bad_Table : std::exception
         {
         public:
             std::string message;
@@ -129,6 +128,8 @@ namespace WellDoneDB
         virtual void operator>>(Table* table) = 0;
         virtual std::string toXml() = 0;
         virtual void loadXml() = 0;
+        virtual void update(std::vector<int> positions, std::string columnName, Type* newData) = 0;
+        virtual void truncate() = 0;
     };
 
     class VectorizedTable : public Table
@@ -175,8 +176,11 @@ namespace WellDoneDB
         void operator>>(Table* table);
         std::string toXml();
         void loadXml();
+        void update(std::vector<int> positions, std::string columnName, Type* newData);
+        void truncate();
     };
     
+    Types stringToType(std::string);
     
 
 } // namespace WellDoneDB

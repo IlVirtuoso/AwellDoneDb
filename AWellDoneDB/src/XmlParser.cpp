@@ -32,7 +32,7 @@ XmlParser::XmlParser(string xmlString) {
 			if (!tag.empty() && !closeTag.empty()) {
 				if (!(tag == closeTag))
 					throw new Bad_Parser("Tag: " + tag + " don't match with close tag: " + closeTag);
-				this->tokens.push_back(Token(tag, value));
+				this->tokens.push_back(XmlToken(tag, value));
 				tag.clear();
 				closeTag.clear();
 				value.clear();	
@@ -40,13 +40,13 @@ XmlParser::XmlParser(string xmlString) {
 			else if (!closeTag.empty() && tag.empty()) {
 				if (!checkCloseTag(closeTag))
 					throw new Bad_Parser("CloseTag: " + closeTag + " don't match with any open tag");
-				this->tokens.push_back(Token(closeTag, value));
+				this->tokens.push_back(XmlToken(closeTag, value));
 				tag.clear();
 				closeTag.clear();
 				value.clear();
 			}
 			else if (closeTag.empty() && !tag.empty()) {
-				this->tokens.push_back(Token(tag, value));
+				this->tokens.push_back(XmlToken(tag, value));
 				tag.clear();
 				closeTag.clear();
 				value.clear();
@@ -89,6 +89,6 @@ int XmlParser::size() {
 	return this->tokens.size();
 }
 
-Token XmlParser::getToken(int index) {
+XmlToken XmlParser::getToken(int index) {
 	return this->tokens.at(index);
 }

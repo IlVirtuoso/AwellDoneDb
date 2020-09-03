@@ -13,7 +13,8 @@ namespace WellDoneDB
         FLOAT,
         DATE,
         TIME,
-        NULLED
+        NULLED,
+        NOTVALID = 1
     };
 
     std::string typeToString(Types type);
@@ -24,7 +25,7 @@ namespace WellDoneDB
         Types type;
 
     public:
-        class Bad_Type
+        class Bad_Type : std::exception
         {
         public:
             std::string message;
@@ -216,7 +217,7 @@ namespace WellDoneDB
         int format;
 
     public:
-        class Bad_Date
+        class Bad_Date : std::exception
         {
         public:
             std::string message;
@@ -242,7 +243,7 @@ namespace WellDoneDB
         int h, m, s, ms;
 
     public:
-        class Bad_Time
+        class Bad_Time : std::exception
         {
         public:
             Bad_Time(std::string message) : youWillHaveABadTime{message} { std::cout << "Bad Time Exception: " << message << std::endl; }
