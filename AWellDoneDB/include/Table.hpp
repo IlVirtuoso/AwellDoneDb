@@ -36,6 +36,9 @@ namespace WellDoneDB
         Column(std::string name, std::string tableName, Types type, std::vector<Pair<Type *, int>> elements = std::vector<Pair<Type *, int>>{}, bool not_null = false, bool index = false, bool autoincrement = false) : name{name}, tableName{tableName}, type{type}, data{elements}, index{index}, not_null{not_null}, autoincrement{autoincrement} {}
         void add(Type &data);
         void add(Type *data);
+        void inline setIndex(bool value) { this->index = value; }
+        void inline setNotNull(bool value) { this->not_null = value; }
+        void setAutoIncrement(bool value);
         void set(int index, Type* newType);
         bool set(Type* oldData, Type* newData);
         void remove(Type &data, bool drop = false);
@@ -64,11 +67,11 @@ namespace WellDoneDB
         Column* col;
         bool exist(Pair<Type*, int>& check);
     public:
-        Selection(Column& col, Conditions condition, Type* dataCompare);
-        Selection(Column& col, Type* lowInterval, Type* highInterval);
+        Selection(Column col, Conditions condition, Type* dataCompare);
+        Selection(Column col, Type* lowInterval, Type* highInterval);
         Selection(){}
-        Selection operator||(Selection& sel);
-        Selection operator&&(Selection& sel);
+        Selection operator||(Selection sel);
+        Selection operator&&(Selection sel);
         std::vector<int> getPos();
     };
 

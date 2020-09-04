@@ -33,6 +33,7 @@ namespace WellDoneDB {
 		else if (word == "PRIMARY KEY" || word == "primary key") return TAG::PRIMARY_KEY;
 		else if (word == "FOREIGN KEY" || word == "foreign key") return TAG::FOREIGN_KEY;
 		else if (word == "REFERENCES" || word == "references") return TAG::REFERENCES;
+		else if (word == "NULL") return TAG::NULLVALUE;
 		else if (word == "VALUES" || word == "values") return TAG::VALUES;
 		else if (stringToType(word) != Types::NOTVALID) return TAG::TYPE;
 		else return TAG::COLUMNORTABLE;
@@ -91,7 +92,7 @@ namespace WellDoneDB {
 				c++;
 				if (*c == ' ') this->tokens.push_back(SQLToken(TAG::CONDITION, buffer));
 				else if (*c == '=') { buffer += *c; this->tokens.push_back(SQLToken(TAG::CONDITION, buffer)); }
-				else throw new Bad_Query("Query error, wrong condition near: " + this->tokens[this->tokens.size()].value + "at char: " + *c);
+				else throw new Bad_Query("Query error, wrong condition near: " + this->tokens[this->tokens.size() - 1].value + "at char: " + *c);
 				c++;
 				buffer.clear();
 				break;
@@ -101,7 +102,7 @@ namespace WellDoneDB {
 				c++;
 				if (*c == ' ') this->tokens.push_back(SQLToken(TAG::CONDITION, buffer));
 				else if (*c == '>' || *c == '=') { buffer += *c; this->tokens.push_back(SQLToken(TAG::CONDITION, buffer)); }
-				else throw new Bad_Query("Query error, wrong condition near: " + this->tokens[this->tokens.size()].value + "at char: " + *c);
+				else throw new Bad_Query("Query error, wrong condition near: " + this->tokens[this->tokens.size() - 1].value + "at char: " + *c);
 				c++;
 				buffer.clear();
 				break;
@@ -111,12 +112,16 @@ namespace WellDoneDB {
 				c++;
 				if (*c == ' ') this->tokens.push_back(SQLToken(TAG::CONDITION, buffer));
 				else if (*c == '=') { buffer += *c; this->tokens.push_back(SQLToken(TAG::CONDITION, buffer)); }
-				else throw new Bad_Query("Query error, wrong condition near: " + this->tokens[this->tokens.size()].value + "at char: " + *c);
+				else throw new Bad_Query("Query error, wrong condition near: " + this->tokens[this->tokens.size() - 1].value + "at char: " + *c);
 				c++;
 				buffer.clear();
 				break;
 
 			case ' ':
+				c++;
+				break;
+
+			case '\n':
 				c++;
 				break;
 
@@ -351,6 +356,13 @@ namespace WellDoneDB {
 				c++;
 				_values();
 			break;
+
+		case TAG::NULLVALUE:
+			c++;
+			if (c->tag == TAG::COMMA)
+				c++;
+			_values();
+			break;
 		default:
 			break;
 		}
@@ -483,7 +495,12 @@ namespace WellDoneDB {
 				break;
 
 			case TAG::CREATE_TABLE:
-				parseCreate();
+				try {
+					parseCreate();
+				}
+				catch (Bad_Query exc) {
+					connected_db->deleteTable(*(connected_db->getTableNames().end() - 1));
+				}
 				break;
 
 			case TAG::DROP:
@@ -524,8 +541,16 @@ namespace WellDoneDB {
 		}
 		c++;
 		table = c->value;
+		if (!this->connected_db->exist(table))
+			throw new Bad_Query("Error table " + table + " don't exist in this database");
 		if(cols.empty())
 			cols = this->connected_db->get(table)->getColNames();
+		else {
+			for (int i = 0; i < cols.size(); i++) {
+				if (!this->connected_db->get(table)->columnExist(cols[i]))
+					throw new Bad_Query("Error column " + cols[i] + " don't exist in table " + table);
+			}
+		}
 		c++;
 		if (c->tag == TAG::WHERE) {
 			std::string column;
@@ -553,9 +578,9 @@ namespace WellDoneDB {
 					c += 2;
 					Type* valueB = stringToType(c->value, typeRetriever(c->value));
 					if (chainCond == TAG::AND)
-						sel = &(*sel && Selection(*this->connected_db->get(table)->get(column), valueA, valueB));
+						sel = new Selection(*sel && Selection(*this->connected_db->get(table)->get(column), valueA, valueB));
 					else if (chainCond == TAG::OR)
-						sel = &(*sel || Selection(*this->connected_db->get(table)->get(column), valueA, valueB));
+						sel = new Selection(*sel || Selection(*this->connected_db->get(table)->get(column), valueA, valueB));
 					else
 						sel = new Selection(*this->connected_db->get(table)->get(column), valueA, valueB);
 				}
@@ -564,6 +589,8 @@ namespace WellDoneDB {
 			if (c->tag == TAG::ORDER_BY) {
 				c++;
 				orderColumn = c->value;
+				if (!this->connected_db->get(table)->columnExist(orderColumn))
+					throw new Bad_Query("Error column " + orderColumn + " don't exist in table " + table);
 				c++;
 				if (c->tag == TAG::DESC)
 					desc = true;
@@ -580,29 +607,212 @@ namespace WellDoneDB {
 	}
 
 	void SQLParser::parseCreate() {
+		c++;
+		std::string table = c->value;
+		if (this->connected_db->exist(table))
+			throw new Bad_Query("Error table " + table + " already exists");
+		this->connected_db->createTable(table);
+		c += 2;
+		std::string columnName;
+		std::string columnType;
+		bool not_null = false;
+		bool auto_increment = false;
+		while(c->tag != TAG::CLOSEBRACKET && c->tag != TAG::FOREIGN_KEY && c->tag != TAG::PRIMARY_KEY){
+			
+			switch (c->tag)
+			{
+			case TAG::COLUMN:
+				columnName = c->value;
+				break;
+
+			case TAG::TYPE:
+				columnType = c->value;
+				break;
+
+			case TAG::AUTOINCREMENT:
+				auto_increment = true;
+				break;
+
+			case TAG::NOT_NULL:
+				not_null = true;
+				break;
+
+			case TAG::COMMA:
+				if (auto_increment && (stringToType(columnType) != Types::INT)) {
+					throw new Bad_Query("column of type " + columnType + " cannot be auto_increment");
+				}
+				this->connected_db->get(table)->createColumn(columnName, stringToType(columnType), not_null, auto_increment);
+				not_null = false;
+				auto_increment = false;
+				columnName.clear();
+				columnType.clear();
+				break;
+			default:
+				break;
+			}
+			c++;
+		}
+		while (c->tag != TAG::COMMAPOINT) {
+			if(c->tag == TAG::PRIMARY_KEY){
+				std::vector<std::string> cols;
+				c += 2;
+				while (c->tag != TAG::CLOSEBRACKET) {
+					if (c->tag == TAG::COLUMN)
+						cols.push_back(c->value);
+					c++;
+				}
+				for (int i = 0; i < cols.size(); i++) {
+					if (!connected_db->get(table)->columnExist(cols[i]))
+						throw new Bad_Query("Error column " + cols[i] + " not specified");
+					connected_db->get(table)->get(cols[i])->setIndex(true);
+				}
+				c++;
+			}
+			else if(c->tag == TAG::FOREIGN_KEY){
+				std::vector<std::string> referenceColumns;
+				std::string tableReferenced;
+				std::vector<std::string> columnReferenced;
+				c += 2;
+				while (c->tag != TAG::CLOSEBRACKET) {
+					if (c->tag == TAG::COLUMN)
+						referenceColumns.push_back(c->value);
+					c++;
+				}
+				c += 2;
+				tableReferenced = c->value;
+				if (!connected_db->exist(tableReferenced))
+					throw new Bad_Query("Error table " + tableReferenced + " not exist in this database");
+				c += 2;
+				while (c->tag != TAG::CLOSEBRACKET) {
+					if (c->tag == TAG::COLUMN)
+						columnReferenced.push_back(c->value);
+					c++;
+				}
+				for (int i = 0; i < referenceColumns.size(); i++) {
+					if(!connected_db->get(table)->columnExist(referenceColumns[i]))
+						throw new Bad_Query("Error column " + referenceColumns[i] + " not specified");
+				}
+				for (int i = 0; i < columnReferenced.size(); i++) {
+					if (!connected_db->get(tableReferenced)->columnExist(referenceColumns[i]))
+						throw new Bad_Query("Error column " + columnReferenced[i] + " not specified");
+				}
+				connected_db->createExternalKey(table, tableReferenced, referenceColumns, columnReferenced);
+			}
+			c++;
+		}
+		std::cout << "Table " + table + " created succesfully" << std::endl;
 
 	}
 
 	void SQLParser::parseDelete()
 	{
+		Selection* sel = nullptr;
+		std::string table;
+		c++;
+		table = c->value;
+		if (!this->connected_db->exist(table))
+			throw new Bad_Query("Error table " + table + " don't exist in this database");
+		c += 2;
+		while (c->tag != TAG::COMMAPOINT)
+		{
+			std::string column;
+			Conditions condition;
+			Type* value;
+
+			if (c->tag == TAG::VALUE) {
+				column = c[-2].value;
+				if (!this->connected_db->exist(table))
+					throw new Bad_Query("Error table " + table + " don't exist in this database");
+				condition = conditionToString(c[-1].value);
+				value = stringToType(c->value, typeRetriever(c->value));
+				if (sel == nullptr)
+					sel = new Selection(*this->connected_db->get(table)->get(column), condition, value);
+				else if (sel != nullptr && c[-3].tag == TAG::AND)
+					sel = new Selection((*sel && Selection(*this->connected_db->get(table)->get(column), condition, value)));
+				else if (sel != nullptr && c[-3].tag == TAG::OR)
+					sel = new Selection((*sel || Selection(*this->connected_db->get(table)->get(column), condition, value)));
+			}
+			else if (c->tag == TAG::BETWEEN) {
+				TAG chainCond = c[-2].tag;
+				column = c[-1].value;
+				if (!this->connected_db->exist(table))
+					throw new Bad_Query("Error table " + table + " don't exist in this database");
+				c++;
+				Type* valueA = stringToType(c->value, typeRetriever(c->value));
+				c += 2;
+				Type* valueB = stringToType(c->value, typeRetriever(c->value));
+				if (chainCond == TAG::AND)
+					sel = new Selection(*sel && Selection(*this->connected_db->get(table)->get(column), valueA, valueB));
+				else if (chainCond == TAG::OR)
+					sel = new Selection(*sel || Selection(*this->connected_db->get(table)->get(column), valueA, valueB));
+				else
+					sel = new Selection(*this->connected_db->get(table)->get(column), valueA, valueB);
+			}
+			c++;
+		}
+		if (sel->getPos().size() > 0) {
+			try {
+				this->connected_db->get(table)->removeRows(sel->getPos(),true);
+			}
+			catch (Table::Bad_Table exc) {
+			
+			}
+		}
+		std::cout << "Removed " + std::to_string(sel->getPos().size()) + " rows from table " + table;
 	}
 
 	void SQLParser::parseTruncate()
 	{
+		c++;
+		std::string table = c->value;
+		if (!this->connected_db->exist(table))
+			throw new Bad_Query("Error table " + table + " don't exist in this database");
+		Table* tab = new VectorizedTable(table);
+		tab->copy(*this->connected_db->get(table));
+		this->connected_db->deleteTable(table);
+		this->connected_db->loadTable(tab);
+		std::cout << "Table " + table + " Truncated" << std::endl;
 	}
 
 	void SQLParser::parseInsert() {
-
+		c++;
+		std::string table = c->value;
+		std::vector<std::string> columns;
+		std::vector<Type*> data;
+		c += 2;
+		while (c->tag != TAG::CLOSEBRACKET) {
+			if (c->tag == TAG::COLUMN)
+				columns.push_back(c->value);
+			c++;
+		}
+		c += 3;
+		while (c->tag != TAG::CLOSEBRACKET) {
+			if (c->tag == TAG::VALUE)
+				data.push_back(stringToType(c->value, typeRetriever(c->value)));
+			c++;
+		}
+		c++;
+		try {
+			connected_db->get(table)->addRow(data, columns);
+		}
+		catch(Table::Bad_Table exc){}
+		std::cout << "Insert successfull" << std::endl;
 	}
 
 	void SQLParser::parseDrop()
 	{
-
+		c++;
+		std::string table = c->value;
+		if (!this->connected_db->exist(table))
+			throw new Bad_Query("Error table " + table + " don't exist in this database");
+		this->connected_db->deleteTable(table);
+		std::cout << "Table " + table + " Deleted";
 	}
 
 	
 	Types typeRetriever(std::string value) {
 		auto c = value.begin();
+		
 		if (_isLecter(*c)) {
 			if (value.size() == 1)
 				return Types::CHAR;

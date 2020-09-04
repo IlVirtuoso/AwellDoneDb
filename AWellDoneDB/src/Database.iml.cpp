@@ -29,6 +29,32 @@ namespace WellDoneDB{
 		ref->setReference(new Table::Reference(referenced, tableColumn, referencedTableColumn));
 	}
 
+	std::vector<std::string> Database::getReferenced(std::string tableName)
+	{
+		std::vector<std::string> cols;
+		for (int i = 0; i < keyReferences.size(); i++) {
+			if (keyReferences[i]->reference->getName() == tableName) {
+				for (int k = 0; k < keyReferences[i]->columnReferenced.size(); k++) {
+					cols.push_back(keyReferences[i]->columnReferenced[k]->getName());
+				}
+			}
+		}
+		return cols;
+	}
+
+	std::vector<std::string> Database::getReference(std::string tableName)
+	{
+		std::vector<std::string> cols;
+		for (int i = 0; i < keyReferences.size(); i++) {
+			if (keyReferences[i]->reference->getName() == tableName) {
+				for (int k = 0; k < keyReferences[i]->columnRefer.size(); k++) {
+					cols.push_back(keyReferences[i]->columnRefer[k]->getName());
+				}
+			}
+		}
+		return cols;
+	}
+
 	std::vector<std::string> Database::getTableNames() {
 		std::vector<std::string> names;
 		std::map<std::string,Table*>::iterator map = this->tables.begin();
@@ -42,6 +68,19 @@ namespace WellDoneDB{
 	void Database::deleteExternalKey(std::string tableName, std::string referencedTable) {
 		this->get(tableName)->unsetReference();
 		this->get(referencedTable)->removeReferenced(tableName);
+	}
+
+	void Database::deleteTable(std::string tableName)
+	{
+		if (!this->getReferenced(tableName).empty()) {
+			throw new Bad_Database("Error this table contain column referenced");
+		}
+		this->tables.erase(tableName);
+	}
+
+	void Database::loadTable(Table* tab)
+	{
+		this->tables.insert(std::make_pair(tab->getName(), tab));
 	}
 
 	std::string Database::toXml() {
@@ -75,14 +114,16 @@ namespace WellDoneDB{
 			std::ofstream created(this->name + ".DB",std::ofstream::out);
 			created.close();
 		}
-		std::string file;
-		char buffer[1024];
-		while (stream.good()) {
-			stream.getline(buffer, 1024);
-			file += buffer;
+	}
+
+
+	void Database::save() {
+		std::ofstream stream(this->name + ".DB");
+		stream.write(this->toXml().c_str(),this->toXml().size());
+		for (int i = 0; i < this->getTableNames().size(); i++) {
+			std::ofstream tablestream(this->getTableNames()[i] + ".table");
+			tablestream.write(this->get(this->getTableNames()[i])->toXml().c_str(), this->get(this->getTableNames()[i])->toXml().size());
 		}
-		XmlParser parser(file);
-		auto token = parser.begin();
 	}
 
 	void Database::loadXml() {

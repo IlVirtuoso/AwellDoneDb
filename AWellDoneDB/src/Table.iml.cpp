@@ -67,6 +67,13 @@ namespace WellDoneDB
         }
     }
 
+    void Column::setAutoIncrement(bool value)
+    {
+        if (this->getType() != Types::INT)
+            throw new Bad_Column("Error Cannot set AutoIncrement on a column of type " + typeToString(this->getType()));
+        this->autoincrement = true;
+    }
+
     void Column::set(int index, Type* newData) {
         if (this->type != newData->getType())
             throw new Bad_Column("Cannot set a dataType: " + typeToString(newData->getType()) + "into a column of type: " + typeToString(this->type));
@@ -178,7 +185,7 @@ namespace WellDoneDB
         this->data.swap(newData);
     }
 
-    Selection::Selection(Column& col, Conditions condition, Type* dataCompare) : condition{ condition }, dataCompare{ dataCompare }, col{ &col } {
+    Selection::Selection(Column col, Conditions condition, Type* dataCompare) : condition{ condition }, dataCompare{ dataCompare }, col{ &col } {
         for (int i = 0; i < col.getSize(); i++) {
             switch (condition)
             {
@@ -212,7 +219,7 @@ namespace WellDoneDB
         }
     }
 
-    Selection Selection::operator&&(Selection& sel) {
+    Selection Selection::operator&&(Selection sel) {
         Selection newSel;
         newSel.col = this->col;
         newSel.condition = this->condition;
@@ -271,7 +278,7 @@ namespace WellDoneDB
         return false;
     }
 
-    Selection Selection::operator||(Selection& sel) {
+    Selection Selection::operator||(Selection sel) {
         Selection newSel;
         newSel.col = this->col;
         newSel.condition = this->condition;
@@ -470,7 +477,7 @@ namespace WellDoneDB
         return newVec;
     }
 
-    Selection::Selection(Column& col, Type* low, Type* high) : condition{ Conditions::BETWEEN }, low{ low }, high{ high }, col{ &col }, dataCompare{ nullptr } {
+    Selection::Selection(Column col, Type* low, Type* high) : condition{ Conditions::BETWEEN }, low{ low }, high{ high }, col{ &col }, dataCompare{ nullptr } {
         for (int i = 0; i < col.getSize(); i++) {
             if (*col[i] <= *high && *col[i] >= *low)
                 this->positions.push_back(col.get(i));

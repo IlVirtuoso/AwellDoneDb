@@ -32,12 +32,21 @@ vector<Type*> generateTime(){
 }
 
 int main(int argc, char * argv[]){
-    Database* db = new Database();
-    db->createTable("times");
-    db->get("times")->createColumn("id", Types::INT);
-    db->get("times")->createColumn("date", Types::DATE);
-    for (int i = 0; i < 100; i++) {
-        db->get("times")->addRow({ generateInt()[0], generateDate()[0] }, { "id","date" });
+    std::string command = "";
+    Database* db = new Database("default");
+    db->loadXml();
+    while (true) {
+        cout << std::endl;
+        cout << "<WellDoneDB>";
+        getline(cin, command);
+        if (command == "QUIT" || command == "quit") {
+            db->save();
+            cout << "saving and exit program" << endl;
+            exit(1);
+        }
+        try {
+            SQLParser parser(command, db);
+        }
+        catch(exception exc){}
     }
-    SQLParser parser("SELECT * FROM times WHERE id BETWEEN 100 AND 1000 ORDER BY id ASC;",db);
 } 

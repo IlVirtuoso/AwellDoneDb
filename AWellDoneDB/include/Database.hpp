@@ -36,13 +36,15 @@ namespace WellDoneDB {
 			std::string referencedTableName,
 			std::vector<std::string> tableColumn, 
 			std::vector<std::string> referencedTableColumn);
-
-
+		std::vector<std::string> getReferenced(std::string tableName);
+		std::vector<std::string> getReference(std::string tableName);
 		std::vector<std::string> getTableNames();
 		void deleteExternalKey(std::string tableName, std::string referencedTable);
-
+		void deleteTable(std::string tableName);
+		void loadTable(Table* tab);
 		std::string toXml();
 		void loadXml();
+		void save();
 	};
 
 }
