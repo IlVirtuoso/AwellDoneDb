@@ -64,15 +64,18 @@ namespace WellDoneDB {
 	class SQLParser {
 	private:
 		SQLlexer lexer;
-		void _col();
-		void _table();
-		void _operand(TAG requested);
-		void _end();
-		void _conditions();
-		void _optoperand();
-		void _values();
-		void _start();
+		std::vector<SQLToken>::iterator c;
+		Database* connected_db;
+		std::vector<SQLToken> actualQuery;
+		void parseSelect();
+		void parseCreate();
+		void parseDelete();
+		void parseTruncate();
+		void parseInsert();
+		void parseDrop();
 	public:
-		SQLParser(std::string query);
+		SQLParser(std::string query, Database * db);
 	};
+
+	Types typeRetriever(std::string);
 }

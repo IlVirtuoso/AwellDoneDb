@@ -214,9 +214,13 @@ namespace WellDoneDB
 
     Selection Selection::operator&&(Selection& sel) {
         Selection newSel;
+        newSel.col = this->col;
+        newSel.condition = this->condition;
+        newSel.dataCompare = this->dataCompare;
+
         for (int i = 0; i < this->positions.size(); i++) {
-            int check = this->positions[i].key;
-            if (check < sel.positions.size()) {
+            int check = sel.positions[i].key;
+            if (check < this->positions.size()) {
                 switch (sel.condition)
                 {
                 case Conditions::EQUAL:
@@ -272,31 +276,30 @@ namespace WellDoneDB
         newSel.col = this->col;
         newSel.condition = this->condition;
         newSel.dataCompare = this->dataCompare;
-        int i = 0, j = 0;
-        while (i < this->positions.size() && j < sel.positions.size()) {
-            if (this->positions[i].key < sel.positions[j].key) {
-                newSel.positions.push_back(this->col->get(this->positions[i].key));
-                i++;
+        auto posA = this->positions.begin();
+        auto posB = sel.positions.begin();
+        while (posA != this->positions.end() && posB != sel.positions.end()) {
+            if (posA->key < posB->key) {
+                this->positions.push_back(*posA);
+                posA++;
             }
-            else if (this->positions[i].key > sel.positions[j].key) {
-                newSel.positions.push_back(this->col->get(sel.positions[j].key));
-                j++;
+            else if (posA->key > posB->key) {
+                this->positions.push_back(*posB);
+                posB++;
             }
             else {
-                newSel.positions.push_back(this->col->get(this->positions[i].key));
-                i++;
-                j++;
+                this->positions.push_back(*posA);
+                posA++;
+                posB++;
             }
         }
-        while (i < this->positions.size()) {
-            if (!this->exist(positions[i]))
-                this->positions.push_back(this->col->get(this->positions[i].key));
-            i++;
+        while (posA != this->positions.end()) {
+            newSel.positions.push_back(*posA);
+            posA++;
         }
-        while (j < sel.positions.size()) {
-            if (!this->exist(sel.positions[j]))
-                this->positions.push_back(this->col->get(sel.positions[j].key));
-            j++;
+        while (posB != sel.positions.end()) {
+            newSel.positions.push_back(*posB);
+            posB++;
         }
         return newSel;
     }
@@ -424,7 +427,7 @@ namespace WellDoneDB
 
     void VectorizedTable::copy(Table& table) {
         for (int i = 0; i < table.getColNum(); i++) {
-            this->createColumn(table.getName() + "." + table.at(i)->getName(), table.at(i)->getType(), false, false, false);
+            this->createColumn(table.at(i)->getName(), table.at(i)->getType(), false, false, false);
         }
     }
 
@@ -596,9 +599,9 @@ namespace WellDoneDB
     Table* VectorizedTable::sort(std::string columnName, bool desc) {
         VectorizedTable* tab = new VectorizedTable(this->name);
         *this >> tab;
-        (*tab)[tab->getName() + "." + columnName]->sort(desc);
+        (*tab)[columnName]->sort(desc);
         for (int i = 0; i < this->columns.size(); i++) {
-            tab->columns[i]->order((*tab)[tab->getName() + "." + columnName]->getPositions());
+            tab->columns[i]->order((*tab)[columnName]->getPositions());
         }
         return tab;
     }
@@ -765,4 +768,11 @@ namespace WellDoneDB
         this->removeRows(positions, true);
     }
  
+    Conditions conditionToString(std::string value) {
+        if (value == ">") return Conditions::GREATHERTHAN;
+        else if (value == "<") return Conditions::LESSTHAN;
+        else if (value == ">=") return Conditions::GREATEREQTHAN;
+        else if (value == "<=") return Conditions::LESSEQTHAN;
+        else if (value == "=") return Conditions::EQUAL;
+    }
 } // namespace WellDoneDB

@@ -384,11 +384,16 @@ namespace WellDoneDB {
 			_optoperand();
 			break;
 
+		case TAG::BETWEEN:
+			c++;
+			_values();
+			_operand(TAG::AND);
+			_values();
+			_optoperand();
+			break;
 		case TAG::ORDER_BY:
 			c++;
-			_operand(TAG::OPENBRACKET);
 			_col();
-			_operand(TAG::CLOSEBRACKET);
 			_optoperand();
 			break;
 
@@ -466,20 +471,157 @@ namespace WellDoneDB {
 	}
 
 
-	void SQLParser::_start(){}	
-	void SQLParser::_col() {}
-	void SQLParser::_table(){}
-	void SQLParser::_operand(TAG requested) {}
-	void SQLParser::_end(){}
-	void SQLParser::_conditions(){}
-	void SQLParser::_optoperand(){}
-	void SQLParser::_values(){}
 
+	SQLParser::SQLParser(std::string query, Database* db) : lexer{ SQLlexer(query) }, connected_db{ db } {
+		for (int i = 0; i < lexer.getTransaction().size(); i++) {
+			this->actualQuery = lexer[i];
+			this->c = actualQuery.begin();
+			switch (c->tag)
+			{
+			case TAG::SELECT:
+				parseSelect();
+				break;
 
+			case TAG::CREATE_TABLE:
+				parseCreate();
+				break;
 
-	SQLParser::SQLParser(std::string query) : lexer{ SQLlexer(query) } {
+			case TAG::DROP:
+				parseDrop();
+				break;
+
+			case TAG::DELETE_FROM:
+				parseDelete();
+				break;
+
+			case TAG::INSERT_INTO:
+				parseInsert();
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
+	
+
+	void SQLParser::parseSelect()
+	{
+		std::vector<std::string> cols;
+		std::string orderColumn;
+		bool desc = false;
+		std::string table;
+		Selection * sel = nullptr;
+		c++;
+		if (!(c->tag == TAG::ASTERISKOP)) {
+			while (c->tag != TAG::FROM) {
+				cols.push_back(c->value);
+				c++;
+			}
+		}
+		else {
+			c++;
+		}
+		c++;
+		table = c->value;
+		if(cols.empty())
+			cols = this->connected_db->get(table)->getColNames();
+		c++;
+		if (c->tag == TAG::WHERE) {
+			std::string column;
+			Conditions condition;
+			Type* value;
+			c++;
+			while (c->tag != TAG::ORDER_BY && c->tag != TAG::COMMAPOINT)
+			{
+				if (c->tag == TAG::VALUE) {
+					column = c[-2].value;
+					condition = conditionToString(c[-1].value);
+					value = stringToType(c->value, typeRetriever(c->value));
+					if (sel == nullptr)
+						sel = new Selection(*this->connected_db->get(table)->get(column), condition, value);
+					else if (sel != nullptr && c[-3].tag == TAG::AND)
+						sel = new Selection((*sel && Selection(*this->connected_db->get(table)->get(column), condition, value)));
+					else if (sel != nullptr && c[-3].tag == TAG::OR)
+						sel = new Selection((*sel || Selection(*this->connected_db->get(table)->get(column), condition, value)));
+				}
+				else if (c->tag == TAG::BETWEEN) {
+					TAG chainCond = c[-2].tag;
+					column = c[-1].value;
+					c++;
+					Type* valueA = stringToType(c->value, typeRetriever(c->value));
+					c += 2;
+					Type* valueB = stringToType(c->value, typeRetriever(c->value));
+					if (chainCond == TAG::AND)
+						sel = &(*sel && Selection(*this->connected_db->get(table)->get(column), valueA, valueB));
+					else if (chainCond == TAG::OR)
+						sel = &(*sel || Selection(*this->connected_db->get(table)->get(column), valueA, valueB));
+					else
+						sel = new Selection(*this->connected_db->get(table)->get(column), valueA, valueB);
+				}
+				c++;
+			}
+			if (c->tag == TAG::ORDER_BY) {
+				c++;
+				orderColumn = c->value;
+				c++;
+				if (c->tag == TAG::DESC)
+					desc = true;
+				c++;
+			}
+		}
+		Table* temp = this->connected_db->get(table);
+		if (sel == nullptr)
+			std::cout<<temp->project(cols)->toString()<<std::endl;
+		else if (!(sel == nullptr) && orderColumn != "")
+			std::cout<<temp->sort(orderColumn, desc)->project(cols)->select(*sel)->toString()<<std::endl;
+		else
+			std::cout<<temp->select(*sel)->project(cols)->toString()<<std::endl;
+	}
+
+	void SQLParser::parseCreate() {
 
 	}
 
+	void SQLParser::parseDelete()
+	{
+	}
+
+	void SQLParser::parseTruncate()
+	{
+	}
+
+	void SQLParser::parseInsert() {
+
+	}
+
+	void SQLParser::parseDrop()
+	{
+
+	}
+
+	
+	Types typeRetriever(std::string value) {
+		auto c = value.begin();
+		if (_isLecter(*c)) {
+			if (value.size() == 1)
+				return Types::CHAR;
+			else
+				return Types::TEXT;
+		}
+		else if (_isCharNumber(*c)) {
+			while (c != value.end()) {
+				if (*c == '.' && _isCharNumber(c[1])) {
+					return Types::FLOAT;
+				}
+				if (*c == ':' && _isCharNumber(c[1]))
+					return Types::TIME;
+				if (*c == '-' && _isCharNumber(c[1]))
+					return Types::DATE;
+				c++;
+			}
+			return Types::INT;
+		}
+	}
 	
 }

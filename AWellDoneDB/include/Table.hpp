@@ -105,6 +105,7 @@ namespace WellDoneDB
         virtual bool columnExist(std::string name) = 0;
         virtual Column* operator[](std::string columnName) = 0;
         virtual Column* at(int index) = 0;
+        virtual Column* get(std::string columnName) { return (*this)[columnName]; }
         virtual std::string getName() = 0;
         virtual std::vector<Type*> getRow(int index) = 0;
         virtual std::vector<Type*> getRow(int index, std::vector<std::string> columns) = 0;
@@ -181,6 +182,6 @@ namespace WellDoneDB
     };
     
     Types stringToType(std::string);
-    
-
+    Type* stringToType(std::string value, Types type);
+    Conditions conditionToString(std::string);
 } // namespace WellDoneDB
