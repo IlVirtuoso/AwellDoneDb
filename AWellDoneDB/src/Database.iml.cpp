@@ -32,34 +32,34 @@ namespace WellDoneDB{
 
 	std::vector<std::string> Database::getReferenced(std::string tableName)
 	{
-		std::vector<std::string> cols;
+		std::vector<std::string> tables;
 		for (int i = 0; i < keyReferences.size(); i++) {
 			if (keyReferences[i]->reference->getName() == tableName) {
-				for (int k = 0; k < keyReferences[i]->columnReferenced.size(); k++) {
-					cols.push_back(keyReferences[i]->columnReferenced[k]->getName());
-				}
+				tables.push_back(keyReferences[i]->reference->getName());
 			}
 		}
-		return cols;
+		return tables;
 	}
 
 	std::vector<std::string> Database::getReference(std::string tableName)
 	{
-		std::vector<std::string> cols;
+		std::vector<std::string> tables;
 		for (int i = 0; i < keyReferences.size(); i++) {
-			if (keyReferences[i]->reference->getName() == tableName) {
-				for (int k = 0; k < keyReferences[i]->columnRefer.size(); k++) {
-					cols.push_back(keyReferences[i]->columnRefer[k]->getName());
-				}
+			if (keyReferences[i]->table->getName() == tableName) {
+				tables.push_back(keyReferences[i]->reference->getName());
 			}
 		}
-		return cols;
+		return tables;
 	}
 
 
 	void Database::deleteExternalKey(std::string tableName, std::string referencedTable) {
 		this->get(tableName)->unsetReference();
 		this->get(referencedTable)->removeReferenced(tableName);
+		for (int i = 0; i < this->keyReferences.size(); i++) {
+			if (this->keyReferences[i]->table->getName() == tableName && this->keyReferences[i]->reference->getName() == referencedTable)
+				this->keyReferences.erase(this->keyReferences.begin() + i);
+		}
 	}
 
 	void Database::deleteTable(std::string tableName)
@@ -71,6 +71,7 @@ namespace WellDoneDB{
 			for (int i = 0; i < this->getReference(tableName).size(); i++) {
 				this->deleteExternalKey(tableName, this->getReference(tableName)[i]);
 			}
+		this->get(tableName)->unsetReference();
 		this->tables.erase(tableName);
 	}
 
@@ -130,10 +131,12 @@ namespace WellDoneDB{
 		while (file.good()) {
 			xml += file.get();
 		}
+		if (xml[0] == -1)
+			return;
 		XmlParser parser(xml);
 		auto token = parser.begin();
+		token++;
 		while (token != parser.end()) {
-			token++;
 			if(token->tag == "name"){
 				this->name = token->value;
 				token++;
@@ -150,12 +153,11 @@ namespace WellDoneDB{
 			}
 			else if (token->tag == "externalKeys") {
 				token++;
+				std::string table;
+				std::string referencedTable;
+				std::vector<std::string> referenceColumn;
+				std::vector<std::string> referencedColumns;
 				while (token->tag != "externalKeys") {
-					token++;
-					std::string table;
-					std::string referencedTable;
-					std::vector<std::string> referenceColumn;
-					std::vector<std::string> referencedColumns;
 					if (token->tag == "externalKey") { //lancia un eccezione
 						if (!table.empty()) {
 							this->createExternalKey(table, referencedTable, referenceColumn, referencedColumns);

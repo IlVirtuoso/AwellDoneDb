@@ -397,6 +397,14 @@ namespace WellDoneDB
 
 
     void VectorizedTable::removeRow(int index, bool drop) {
+        for (int i = 0; i < this->referenced.size(); i++) {
+            auto referencedColumns = this->referenced[i]->referenced;
+            auto referenceColumns = this->referenced[i]->reference;
+            auto referenceTab = this->referenced[i]->tab;
+            auto row = this->getRow(index, referencedColumns);
+            if (referenceTab->rowExist(row, referenceColumns))
+                throw new Bad_Table("Error this delete violates foreign key with: " + referenceTab->getName());
+        }
         for (int i = 0; i < this->columns.size(); i++) {
             columns[i]->remove(index, drop);
         }
@@ -404,9 +412,7 @@ namespace WellDoneDB
 
     void VectorizedTable::removeRows(std::vector<int> indexes, bool drop) {
         for (int k = 0; k < indexes.size(); k++) {
-            for (int i = 0; i < this->columns.size(); i++) {
-                columns[i]->remove(indexes[k], drop);
-            }
+            removeRow(indexes[k], drop);
         }
     }
 
@@ -573,12 +579,13 @@ namespace WellDoneDB
         if (this->references != nullptr)
             this->references->tab->removeReferenced(this->name);
         this->references = ref;
-        ref->tab->addReferenced(ref);
+        ref->tab->addReferenced(new Reference(this,ref->reference,ref->referenced));
     }
 
     void VectorizedTable::unsetReference() {
-        if (this->references != nullptr)
+        if (this->references != nullptr) {
             this->references->tab->removeReferenced(this->name);
+        }
         this->references = nullptr;
     }
 
@@ -600,6 +607,8 @@ namespace WellDoneDB
     }
 
     void VectorizedTable::removeReferenced(std::string tableName) {
+        if (this->referenced.size() == 0)
+            return;
         for (int i = 0; i < this->referenced.size(); i++) {
             if (referenced[i]->tab->getName() == tableName)
                 referenced.erase(referenced.begin() + i);
