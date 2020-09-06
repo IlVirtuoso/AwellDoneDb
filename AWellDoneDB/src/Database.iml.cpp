@@ -93,9 +93,9 @@ namespace WellDoneDB{
 			xml += "<externalKey>\n";
 			xml += "<referenceTable>" + this->keyReferences[i]->table->getName() + "</referenceTable>\n";
 			xml += "<referencedTable>" + this->keyReferences[i]->reference->getName() + "</referencedTable>\n";
-			for (int k = 0; k < this->keyReferences[i]->columnRefer.size(); i++) //genera un eccezione
+			for (int k = 0; k < this->keyReferences[i]->columnRefer.size(); k++) //genera un eccezione
 				xml += "<referenceColumn>" + this->keyReferences[i]->columnRefer[k]->getName() + "</referenceColumn>\n";
-			for (int k = 0; k < this->keyReferences[i]->columnReferenced.size(); i++)
+			for (int k = 0; k < this->keyReferences[i]->columnReferenced.size(); k++)
 				xml += "<referencedColumn>" + this->keyReferences[i]->columnReferenced[k]->getName() + "</referencedColumn>\n";
 			xml += "</externalKey>\n";
 		}
@@ -133,6 +133,11 @@ namespace WellDoneDB{
 		XmlParser parser(xml);
 		auto token = parser.begin();
 		while (token != parser.end()) {
+			token++;
+			if(token->tag == "name"){
+				this->name = token->value;
+				token++;
+			}
 			if (token->tag == "tables") {
 				token++;
 				while (token->tag != "tables") {
@@ -151,7 +156,7 @@ namespace WellDoneDB{
 					std::string referencedTable;
 					std::vector<std::string> referenceColumn;
 					std::vector<std::string> referencedColumns;
-					if (token->tag == "externalKey") {
+					if (token->tag == "externalKey") { //lancia un eccezione
 						if (!table.empty()) {
 							this->createExternalKey(table, referencedTable, referenceColumn, referencedColumns);
 						}
