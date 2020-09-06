@@ -1,4 +1,3 @@
-#pragma once
 #include "../include/Table.hpp"
 #include <fstream>
 #include "../include/XmlParser.hpp"
@@ -33,7 +32,7 @@ namespace WellDoneDB
                 throw new Bad_Column("Adding NULL element on index column :" + name);
             }
         }
-        if (elem.getType() != type)
+        if (elem.getType() != type && !elem.isNull())
             throw new Bad_Column("Adding element of type: " + typeToString(elem.getType()) + "to a column of type: " + typeToString(type));
         if (data.empty())
         {
@@ -118,7 +117,7 @@ namespace WellDoneDB
 
 
     void Column::sort(bool desc) {
-        _typeQuickSort(0, this->data.size() - 1);
+        _typeQuickSort(0, static_cast<int>(this->data.size() - 1));
         if (desc) {
             std::vector<Pair<Type*, int>> vec;
             for (int i = 0; i < this->data.size(); i++) {
@@ -331,7 +330,7 @@ namespace WellDoneDB
 
     }
     int VectorizedTable::getMaxSize() {
-        int max = 0;
+        size_t max = 0;
         for (int i = 0; i < columns.size(); i++) {
             if (columns[i]->getSize() > max)
                 max = columns[i]->getSize();
@@ -342,16 +341,44 @@ namespace WellDoneDB
 
         if (data.size() != columnNames.size())
             throw new Bad_Table("vector of data and names of different sizes");
+        if (this->references != nullptr) {
+            std::vector<std::string> columnChecks;
+            std::vector<Type*>dataChecks;
+            for (int i = 0; i < columnNames.size(); i++) {
+                for (int j = 0; j < this->references->reference.size(); j++) {
+                    if (columnNames[i] == this->references->reference[j]) {
+                        columnChecks.push_back(this->references->reference[j]);
+                        dataChecks.push_back(data[i]);
+                        continue;
+                    }
+                }
+            }
+            if (!this->references->tab->rowExist(dataChecks, columnChecks))
+                throw new Bad_Table("Error this row violates foreign key references on table: " + this->references->tab->getName());
+        }
         for (int i = 0; i < data.size(); i++) {
-            (*this)[columnNames[i]]->add(data[i]);
+            try {
+                (*this)[columnNames[i]]->add(data[i]);
+            }
+            catch (...) {
+                for (int k = i - 1; k >= 0; k--) {
+                    (*this)[columnNames[k]]->remove((*this)[columnNames[k]]->getSize() - 1,true);
+                }
+                throw new Bad_Table("Error while inserting a row");
+            }
         }
         if (check) {
             int normSize = this->getMaxSize();
             for (int i = 0; i < columns.size(); i++) {
                 if (columns[i]->getSize() < normSize) {
                     if (columns[i]->autoincrement) {
-                        Integer& prev = dynamic_cast<Integer&>(*columns[i]->at(columns[i]->getSize() - 1));
-                        columns[i]->add(new Integer(prev.getData() + 1));
+                        if (columns[i]->getSize() > 0) {
+                            Integer& prev = dynamic_cast<Integer&>(*columns[i]->at(columns[i]->getSize() - 1));
+                            columns[i]->add(new Integer(prev.getData() + 1));
+                        }
+                        else {
+                            columns[i]->add(new Integer(0));
+                        }
                     }
                     else if (!columns[i]->not_null) {
                         columns[i]->add(new Null());
@@ -363,22 +390,6 @@ namespace WellDoneDB
                         }
                         throw new Bad_Table("error Missing data for column: " + columns[i]->getName());
                     }
-                }
-            }
-            if (this->references != nullptr) {
-                if (!references->tab->rowExist(this->getRow(this->getMaxSize() - 1, this->references->referenced))) {
-                    this->removeRow(this->getMaxSize() - 1, true);
-                    std::string error("Error foreign key broken for: ");
-                    error += this->getName() + "(";
-                    for (int i = 0; i < this->references->reference.size(); i++) {
-                        error += this->references->reference[i] + ",";
-                    }
-                    error += ") references " + references->tab->getName();
-                    for (int i = 0; i < this->references->referenced.size(); i++) {
-                        error += this->references->referenced[i] + ",";
-                    }
-                    error += ")";
-                    throw new Bad_Table(error);
                 }
             }
         }
@@ -521,13 +532,14 @@ namespace WellDoneDB
     {
         std::vector<Type*> vec;
         for (int i = 0; i < columns.size(); i++) {
-            vec.push_back(this->at(i)->at(index));
+            vec.push_back(this->get(columns[i])->at(index));
         }
         return vec;
     }
 
     bool elemExist(Type* data, std::vector<Type*> container) {
         for (int i = 0; i < container.size(); i++) {
+        if(data->getType() == container[i]->getType())
             if (*data == *container[i])
                 return true;
         }
@@ -545,7 +557,7 @@ namespace WellDoneDB
     bool VectorizedTable::rowExist(std::vector<Type*> data, std::vector<std::string> cols)
     {
         for (int i = 0; i < this->getMaxSize(); i++) {
-            if (vectorSubEquals(data, this->getRow(i)))
+            if (vectorSubEquals(data, this->getRow(i,cols)))
                 return true;
         }
         return false;
@@ -638,7 +650,7 @@ namespace WellDoneDB
         case WellDoneDB::Table::TableType::VECTORIZED:
             return std::string("VECTORIZED");
             break;
-        default:
+        default: return std::string("VECTORIZED");
             break;
         }
     }
@@ -694,12 +706,12 @@ namespace WellDoneDB
         case WellDoneDB::Types::TEXT:
             return new Text(value);
         case WellDoneDB::Types::FLOAT:
-            return new Float(atof(value.c_str()));
+            return new Float(static_cast<float>(atof(value.c_str())));
         case WellDoneDB::Types::DATE:
             return new Date(value,Date::DD_MM_YYYY);
         case WellDoneDB::Types::TIME:
             return new Time(value);
-        default:
+        default: return new Null();
             break;
         }
     }
@@ -780,6 +792,7 @@ namespace WellDoneDB
         else if (value == "<") return Conditions::LESSTHAN;
         else if (value == ">=") return Conditions::GREATEREQTHAN;
         else if (value == "<=") return Conditions::LESSEQTHAN;
-        else if (value == "=") return Conditions::EQUAL;
+        else return Conditions::EQUAL;
+
     }
 } // namespace WellDoneDB

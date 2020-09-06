@@ -5,6 +5,9 @@
 #include <exception>
 namespace WellDoneDB
 {
+    /**
+     * @brief Enumerazione dei tipi supportati
+    */
     enum class Types
     {
         INT,
@@ -17,7 +20,16 @@ namespace WellDoneDB
         NOTVALID = 1
     };
 
+    /**
+     * @brief Converte un enumerazione Types in una stringa
+     * @param type 
+     * @return 
+    */
     std::string typeToString(Types type);
+
+    /**
+     * @brief Interfaccia per la rappresentazione di tipi
+    */
     class Type
     {
     protected:
@@ -25,16 +37,36 @@ namespace WellDoneDB
         Types type;
 
     public:
+        /**
+         * @brief Classe per le eccezioni dei tipi
+        */
         class Bad_Type : std::exception
         {
         public:
             std::string message;
             Bad_Type(std::string message) : message{message} { std::cout << "Exception: " << message << std::endl; }
         };
+
+        /**
+         * @brief Ritorna il tipo di oggetto
+         * @return un enumerazione Types
+        */
         Types getType() { return type; }
+
+        /**
+         * @brief Converte il contenuto dell'oggetto in una stringa
+         * @return 
+        */
         virtual std::string toString() = 0;
+
         bool isNull() { return is_null; }
         void setNull(bool value) { is_null = value; }
+
+        /**
+         * @brief Operatori di confronto per i tipi
+         * @param type tipo con cui confrontare l'oggetto
+         * @warning lancia un eccezione se il tipo é diverso dal tipo di questo oggetto
+        */
         virtual bool operator<(Type &type) = 0;
         virtual bool operator>(Type &type) = 0;
         virtual bool operator==(Type &type) = 0;
@@ -43,6 +75,9 @@ namespace WellDoneDB
         bool operator!=(Type &type) { return !(*this == type); }
     };
 
+    /**
+     * @brief Classe per rappresentare gli interi
+    */
     class Integer : public Type
     {
     private:
@@ -82,6 +117,9 @@ namespace WellDoneDB
         }
     };
 
+    /**
+     * @brief Classe per rappresentare i caratteri
+    */
     class Char : public Type
     {
     private:
@@ -115,6 +153,9 @@ namespace WellDoneDB
         }
     };
 
+    /**
+     * @brief Classe per rappresentare le stringhe di lunghezza arbitraria
+    */
     class Text : public Type
     {
     private:
@@ -147,6 +188,10 @@ namespace WellDoneDB
         }
     };
 
+
+    /**
+     * @brief Classe per rappresentare i numeri a virgola mobile
+    */
     class Float : public Type
     {
     private:
@@ -180,6 +225,11 @@ namespace WellDoneDB
         }
     };
 
+    /**
+     * @brief Classe per rappresentare i tipi nulli
+     * @warning questo tipo di oggetto si puó inserire in tutte le colonne
+     * di qualunque tipo a patto che non siano not null
+    */
     class Null : public Type
     {
     public:
@@ -209,6 +259,11 @@ namespace WellDoneDB
         }
     };
 
+    /**
+     * @brief Classe per rappresentare la data
+     * di default verrá usato il formato DD_MM_YYYY, che é il formato standard
+     * ma é possibile usarne anche altri implementati nelle loro enumerazione
+    */
     class Date : public Type
     {
     protected:
@@ -217,40 +272,81 @@ namespace WellDoneDB
         int format;
 
     public:
+        /**
+         * @brief Classe di eccezioni per le date
+        */
         class Bad_Date : std::exception
         {
         public:
             std::string message;
             Bad_Date(std::string message) : message{message} { std::cout << "Date Exception: " << message << std::endl; }
         };
+
+        /**
+         * @brief Enumerazione di vari formati disponibili
+        */
         enum FORMAT
         {
             DD_MM_YYYY,
             MM_DD_YYYY,
             YYYY_MM_DD
         };
+        
+        /**
+         * @brief Costruttore per stringhe
+         * @param date data in formato stringa
+         * @param format formato della stringa dall'enumerazione FORMAT
+        */
         Date(std::string date, int format);
+
+        /**
+         * @brief Costruttore rapido per la data
+         * @param dd giorno
+         * @param mm mese
+         * @param yy anno
+         * @param format formato dall'enum FORMAT
+        */
         Date(int dd, int mm, int yy, int format = DD_MM_YYYY);
+
         std::string toString();
         bool operator<(Type &type) override;
         bool operator>(Type &type) override;
         bool operator==(Type &type) override;
     };
 
+    /**
+     * @brief Classe per la rappresentazione dle tempo
+    */
     class Time : public Type
     {
     protected:
         int h, m, s, ms;
-
     public:
+        /**
+         * @brief Classe per le eccezione della classe Time
+        */
         class Bad_Time : std::exception
         {
         public:
             Bad_Time(std::string message) : youWillHaveABadTime{message} { std::cout << "Bad Time Exception: " << message << std::endl; }
             std::string youWillHaveABadTime;
         };
-
+        /**
+         * @brief Costruttore rapido della classe time
+         * @param h ora
+         * @param m minuti
+         * @param s secondi
+         * @param ms millisecondi
+        */
         Time(int h = 0, int m = 0, int s = 0, int ms = 0);
+
+        /**
+         * @brief Costruttore per la conversione di una stringa in formato tempo
+         * @param time stringa rappresentante il tempo
+         * é possibile non specificare sempre il formato ora:minuti:secondi.millisecondi
+         * il costruttore si occupera di parsificare la stringa e di impostare solo i valori passati
+         * per tutti gli altri si assumerá siano 0
+        */
         Time(std::string time);
         std::string toString();
         bool operator>(Type &type);
@@ -260,6 +356,11 @@ namespace WellDoneDB
 
     template <class T, typename K>
 
+    /**
+     * @brief Classe template per le coppie di valori Chiave-Valore
+     * @tparam T Tipo del valore
+     * @tparam K Tipo della chiave
+    */
     class Pair
     {
     public:

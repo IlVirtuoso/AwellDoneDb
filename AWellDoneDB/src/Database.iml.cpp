@@ -8,6 +8,7 @@ namespace WellDoneDB{
 		{
 		case WellDoneDB::Table::TableType::VECTORIZED:
 			this->tables.insert(std::make_pair(tableName, new VectorizedTable(tableName)));
+			this->tableNames.push_back(tableName);
 			break;
 		default:
 			break;
@@ -55,15 +56,6 @@ namespace WellDoneDB{
 		return cols;
 	}
 
-	std::vector<std::string> Database::getTableNames() {
-		std::vector<std::string> names;
-		std::map<std::string,Table*>::iterator map = this->tables.begin();
-		while (map != this->tables.end()) {
-			names.push_back(map->first);
-			map++;
-		}
-		return names;
-	}
 
 	void Database::deleteExternalKey(std::string tableName, std::string referencedTable) {
 		this->get(tableName)->unsetReference();
@@ -75,6 +67,10 @@ namespace WellDoneDB{
 		if (!this->getReferenced(tableName).empty()) {
 			throw new Bad_Database("Error this table contain column referenced");
 		}
+		if (!this->getReference(tableName).empty())
+			for (int i = 0; i < this->getReference(tableName).size(); i++) {
+				this->deleteExternalKey(tableName, this->getReference(tableName)[i]);
+			}
 		this->tables.erase(tableName);
 	}
 
@@ -97,7 +93,7 @@ namespace WellDoneDB{
 			xml += "<externalKey>\n";
 			xml += "<referenceTable>" + this->keyReferences[i]->table->getName() + "</referenceTable>\n";
 			xml += "<referencedTable>" + this->keyReferences[i]->reference->getName() + "</referencedTable>\n";
-			for (int k = 0; k < this->keyReferences[i]->columnRefer.size(); i++)
+			for (int k = 0; k < this->keyReferences[i]->columnRefer.size(); i++) //genera un eccezione
 				xml += "<referenceColumn>" + this->keyReferences[i]->columnRefer[k]->getName() + "</referenceColumn>\n";
 			for (int k = 0; k < this->keyReferences[i]->columnReferenced.size(); i++)
 				xml += "<referencedColumn>" + this->keyReferences[i]->columnReferenced[k]->getName() + "</referencedColumn>\n";
@@ -123,7 +119,9 @@ namespace WellDoneDB{
 		for (int i = 0; i < this->getTableNames().size(); i++) {
 			std::ofstream tablestream(this->getTableNames()[i] + ".table");
 			tablestream.write(this->get(this->getTableNames()[i])->toXml().c_str(), this->get(this->getTableNames()[i])->toXml().size());
+			tablestream.close();
 		}
+		stream.close();
 	}
 
 	void Database::loadXml() {

@@ -1,0 +1,1 @@
+per effettuare il test si puó copiare il file e incollarlo sul terminale

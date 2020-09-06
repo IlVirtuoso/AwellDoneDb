@@ -85,7 +85,7 @@ bool XmlParser::tagExists(string tag) {
 	return false;
 }
 
-int XmlParser::size() {
+size_t XmlParser::size() {
 	return this->tokens.size();
 }
 

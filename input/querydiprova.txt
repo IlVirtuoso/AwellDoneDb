@@ -1,0 +1,11 @@
+CREATE TABLE site(username TEXT NOT NULL, id INT NOT NULL AUTO_INCREMENT, password TEXT, PRIMARY KEY(id,username));
+CREATE TABLE applicazioni(id INT NOT NULL, name TEXT NOT NULL, PRIMARY KEY(name), FOREIGN KEY(id) REFERENCES site(id));
+CREATE TABLE operatori(id INT NOT NULL, username TEXT NOT NULL, PRIMARY KEY(id,username), FOREIGN KEY(id,username) REFERENCES site(id,username));
+INSERT INTO site(username,password) VALUES('till lindemann','Rammstein');
+INSERT INTO applicazioni(id,name) VALUES (0,'react');
+INSERT INTO applicazioni(name,id) VALUES('poli',3);
+INSERT INTO operatori(id,username) VALUES (0,'till lindemann');
+INSERT INTO operatori(id,username) VALUES (3,'robert');
+SELECT * FROM site;
+SELECT * FROM applicazioni;
+SELECT * FROM operatori;

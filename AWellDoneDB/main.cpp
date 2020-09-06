@@ -31,7 +31,7 @@ vector<Type*> generateTime(){
     return time;
 }
 
-int main(int argc, char * argv[]){
+int main(int argc, char* argv[]) {
     std::string command = "";
     Database* db = new Database("default");
     db->loadXml();
@@ -44,9 +44,8 @@ int main(int argc, char * argv[]){
             cout << "saving and exit program" << endl;
             exit(1);
         }
-        try {
+        else if (command != "") {
             SQLParser parser(command, db);
         }
-        catch(exception exc){}
     }
-} 
+}

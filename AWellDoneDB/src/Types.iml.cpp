@@ -161,7 +161,7 @@ namespace WellDoneDB
         if (type.getType() != this->getType())
             throw new Bad_Type("Cannot compare " + typeToString(this->type) + " with " + typeToString(type.getType()));
         Time typeTime = dynamic_cast<Time &>(type);
-        long calc = (h - typeTime.h) * pow(10, 6) + (m - typeTime.m) * pow(10, 4) + (s - typeTime.s) * pow(10, 2);
+        long calc = (h - typeTime.h) * static_cast<int>(pow(10, 6)) + (m - typeTime.m) * static_cast<int>(pow(10, 4)) + (s - typeTime.s) * static_cast<int>(pow(10, 2));
         if (calc > 0)
             return true;
         else if(calc == 0 && ms > typeTime.ms)
@@ -174,7 +174,7 @@ namespace WellDoneDB
         if (type.getType() != this->getType())
             throw new Bad_Type("Cannot compare " + typeToString(this->type) + " with " + typeToString(type.getType()));
         Time typeTime = dynamic_cast<Time &>(type);
-        long calc = (h - typeTime.h) * pow(10, 6) + (m - typeTime.m) * pow(10, 4) + (s - typeTime.s) * pow(10, 2);
+        long calc = (h - typeTime.h) * static_cast<int>(pow(10, 6)) + (m - typeTime.m) * static_cast<int>(pow(10, 4)) + (s - typeTime.s) * static_cast<int>(pow(10, 2));
         if (calc < 0)
             return true;
         else if(calc == 0 && ms < typeTime.ms)
