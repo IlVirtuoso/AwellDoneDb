@@ -9,3 +9,7 @@ INSERT INTO operatori(id,username) VALUES (3,'robert');
 SELECT * FROM site;
 SELECT * FROM applicazioni;
 SELECT * FROM operatori;
+DROP TABLE site;
+DROP TABLE operatori;
+DROP TABLE applicazioni;
+DROP TABLE site;

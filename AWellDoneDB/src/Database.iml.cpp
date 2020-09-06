@@ -72,6 +72,10 @@ namespace WellDoneDB{
 				this->deleteExternalKey(tableName, this->getReference(tableName)[i]);
 			}
 		this->get(tableName)->unsetReference();
+		for (int i = 0; i < this->tableNames.size(); i++) {
+			if (this->tableNames[i] == tableName)
+				this->tableNames.erase(this->tableNames.begin() + i);
+		}
 		this->tables.erase(tableName);
 	}
 
