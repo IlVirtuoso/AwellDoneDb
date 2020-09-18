@@ -118,6 +118,7 @@ namespace WellDoneDB {
 		void parseTruncate();
 		void parseInsert();
 		void parseDrop();
+		void parseUpdate();
 	public:
 		/**
 		 * @brief Costruttore della classe SQLParser

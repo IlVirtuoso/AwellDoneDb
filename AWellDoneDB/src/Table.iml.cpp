@@ -1,6 +1,7 @@
 #include "../include/Table.hpp"
 #include <fstream>
 #include "../include/XmlParser.hpp"
+#include <algorithm>
 namespace WellDoneDB
 {
     Column::Column(std::string name, std::string tableName, Types type, std::vector<Type*> elements, bool not_null, bool index, bool autoincrement) : not_null{ not_null }, index{ index }, autoincrement{ autoincrement }, tableName{ tableName }, name{ name }, type{ type }
@@ -66,6 +67,10 @@ namespace WellDoneDB
         }
     }
 
+#define __AssertType__(Type_a, Type_b)\
+     if ( Type_a != Type_b)\
+        throw new Bad_Column("Cannot set a dataType: " + typeToString(Type_a) + "into a column of type: " + typeToString(Type_b))
+
     void Column::setAutoIncrement(bool value)
     {
         if (this->getType() != Types::INT)
@@ -74,15 +79,13 @@ namespace WellDoneDB
     }
 
     void Column::set(int index, Type* newData) {
-        if (this->type != newData->getType())
-            throw new Bad_Column("Cannot set a dataType: " + typeToString(newData->getType()) + "into a column of type: " + typeToString(this->type));
+        __AssertType__(this->getType(), newData->getType());
         this->data[index].value = newData;
     }
 
     bool Column::set(Type* oldData, Type* newData) {
 
-        if (this->type != newData->getType())
-            throw new Bad_Column("Cannot set a dataType: " + typeToString(newData->getType()) + "into a column of type: " + typeToString(this->type));
+        __AssertType__(this->getType(), newData->getType());
         for (int i = 0; i < this->data.size(); i++)
             if (*data[i].value == *oldData) {
                 data[i].value = newData;
@@ -91,40 +94,16 @@ namespace WellDoneDB
         return false;
     }
 
-
-    void Column::_typeQuickSort(int left, int right) {
-        int i = left, j = right;
-        Pair<Type*, int> tmp{ nullptr, 0 };
-        auto pivot = this->data[(left + right) / 2].value;
-        while (i <= j) {
-            while (*this->data[i].value < *pivot)
-                i++;
-            while (*this->data[j].value > * pivot)
-                j--;
-            if (i <= j) {
-                tmp = this->data[i];
-                this->data[i] = this->data[j];
-                this->data[j] = tmp;
-                i++;
-                j--;
-            }
-        }
-        if (left < j)
-            _typeQuickSort(left, j);
-        if (i < right)
-            _typeQuickSort(i, right);
+    bool _comparePairAsc(Pair<Type*, int> a, Pair<Type*, int> b) {
+        return (*a.value < *b.value);
     }
 
-
+    bool _comparePairDesc(Pair<Type*, int> a, Pair<Type*, int> b) {
+        return (*a.value > *b.value);
+    }
     void Column::sort(bool desc) {
-        _typeQuickSort(0, static_cast<int>(this->data.size() - 1));
-        if (desc) {
-            std::vector<Pair<Type*, int>> vec;
-            for (int i = 0; i < this->data.size(); i++) {
-                vec.push_back(this->data[this->data.size() - 1 - i]);
-            }
-            this->data = vec;
-        }
+        if(!desc) std::sort(this->data.begin(), this->data.end(), _comparePairAsc);
+        else std::sort(this->data.begin(), this->data.end(), _comparePairDesc);
     }
 
     void Column::remove(int index, bool drop)
@@ -184,86 +163,66 @@ namespace WellDoneDB
         this->data.swap(newData);
     }
 
+    /**
+     * @brief Funzione di comparazione per tipi 
+     * @param a dato Type*
+     * @param condition condizione
+     * @param b dato Type*, in caso la condizione é between sará il valore minimo dell'intervallo
+     * @param c dato Type*, é il valore massimo dell'intervallo altrimenti non viene usato
+     * @return 
+    */
+    bool _typeCompare(Type* a, Conditions condition, Type* b, Type* c = nullptr) {
+        switch (condition)
+        {
+        case Conditions::EQUAL:
+            return (*a == *b);
+
+
+        case Conditions::GREATEREQTHAN:
+            return (*a >= *b);
+
+
+        case Conditions::GREATHERTHAN:
+            return (*a > * b);
+
+
+        case Conditions::LESSEQTHAN:
+            return (*a <= *b);
+
+        case Conditions::LESSTHAN:
+            return (*a < *b);
+
+        case Conditions::NOT:
+            return (*a != *b);
+
+        case Conditions::BETWEEN:
+            if (c == nullptr)
+                return 0;
+            else {
+                return (*a >= *b && *a <= *c);
+            }
+        default:
+            return 0;
+            break;
+        }
+    }
     Selection::Selection(Column col, Conditions condition, Type* dataCompare) : condition{ condition }, dataCompare{ dataCompare }, col{ &col } {
         for (int i = 0; i < col.getSize(); i++) {
-            switch (condition)
-            {
-            case WellDoneDB::Conditions::EQUAL:
-                if (*col[i] == *dataCompare)
-                    positions.push_back(col.get(i));
-                break;
-            case WellDoneDB::Conditions::LESSTHAN:
-                if (*col[i] < *dataCompare)
-                    positions.push_back(col.get(i));
-                break;
-            case WellDoneDB::Conditions::GREATHERTHAN:
-                if (*col[i] > * dataCompare)
-                    positions.push_back(col.get(i));
-                break;
-            case WellDoneDB::Conditions::LESSEQTHAN:
-                if (*col[i] <= *dataCompare)
-                    positions.push_back(col.get(i));
-                break;
-            case WellDoneDB::Conditions::GREATEREQTHAN:
-                if (*col[i] >= *dataCompare)
-                    positions.push_back(col.get(i));
-                break;
-            case WellDoneDB::Conditions::NOT:
-                if (*col[i] != *dataCompare)
-                    positions.push_back(col.get(i));
-                break;
-            default:
-                break;
-            }
+            if (_typeCompare(col[i], condition, dataCompare))
+                positions.push_back(col.get(i));
         }
     }
 
+ 
     Selection Selection::operator&&(Selection sel) {
         Selection newSel;
         newSel.col = this->col;
         newSel.condition = this->condition;
         newSel.dataCompare = this->dataCompare;
-
         for (int i = 0; i < this->positions.size(); i++) {
-            int check = sel.positions[i].key;
-            if (check < this->positions.size()) {
-                switch (sel.condition)
-                {
-                case Conditions::EQUAL:
-                    if (*sel.positions[check].value == *sel.dataCompare)
-                        newSel.positions.push_back(this->positions[check]);
-                    break;
-
-                case Conditions::GREATEREQTHAN:
-                    if (*sel.positions[check].value >= *sel.dataCompare)
-                        newSel.positions.push_back(this->positions[check]);
-                    break;
-                case Conditions::GREATHERTHAN:
-                    if (*sel.positions[check].value > * sel.dataCompare)
-                        newSel.positions.push_back(this->positions[check]);
-                    break;
-
-                case Conditions::LESSEQTHAN:
-                    if (*sel.positions[check].value <= *sel.dataCompare)
-                        newSel.positions.push_back(this->positions[check]);
-                    break;
-
-                case Conditions::LESSTHAN:
-                    if (*sel.positions[check].value < *sel.dataCompare)
-                        newSel.positions.push_back(this->positions[check]);
-                    break;
-
-                case Conditions::NOT:
-                    if (*sel.positions[check].value != *sel.dataCompare)
-                        newSel.positions.push_back(this->positions[check]);
-                    break;
-                case Conditions::BETWEEN:
-                    if (*sel.positions[check].value <= *sel.high && *sel.positions[check].value >= *sel.high)
-                        newSel.positions.push_back(this->positions[check]);
-                    break;
-                default:
-                    break;
-                }
+            for (int j = 0; j < sel.positions.size(); j++) {
+                if (this->positions[i].key == sel.positions[j].key)
+                    newSel.positions.push_back(this->positions[i]);
             }
         }
         return newSel;
@@ -276,37 +235,24 @@ namespace WellDoneDB
         }
         return false;
     }
+    
+    bool _compareKey(Pair<Type*, int> a, Pair<Type*, int> b) {
+        return (a.key < b.key);
+    }
+
 
     Selection Selection::operator||(Selection sel) {
         Selection newSel;
         newSel.col = this->col;
         newSel.condition = this->condition;
         newSel.dataCompare = this->dataCompare;
-        auto posA = this->positions.begin();
-        auto posB = sel.positions.begin();
-        while (posA != this->positions.end() && posB != sel.positions.end()) {
-            if (posA->key < posB->key) {
-                this->positions.push_back(*posA);
-                posA++;
-            }
-            else if (posA->key > posB->key) {
-                this->positions.push_back(*posB);
-                posB++;
-            }
-            else {
-                this->positions.push_back(*posA);
-                posA++;
-                posB++;
+        newSel.positions = this->positions;
+        for (int i = 0; i < sel.positions.size(); i++) {
+            if (!newSel.exist(sel.positions[i])) {
+                newSel.positions.push_back(sel.positions[i]);
             }
         }
-        while (posA != this->positions.end()) {
-            newSel.positions.push_back(*posA);
-            posA++;
-        }
-        while (posB != sel.positions.end()) {
-            newSel.positions.push_back(*posB);
-            posB++;
-        }
+        std::sort(newSel.positions.begin(), newSel.positions.end(), _compareKey);
         return newSel;
     }
 
@@ -347,7 +293,7 @@ namespace WellDoneDB
             for (int i = 0; i < columnNames.size(); i++) {
                 for (int j = 0; j < this->references->reference.size(); j++) {
                     if (columnNames[i] == this->references->reference[j]) {
-                        columnChecks.push_back(this->references->reference[j]);
+                        columnChecks.push_back(this->references->referenced[j]);
                         dataChecks.push_back(data[i]);
                         continue;
                     }
@@ -397,6 +343,7 @@ namespace WellDoneDB
 
 
     void VectorizedTable::removeRow(int index, bool drop) {
+        /*
         for (int i = 0; i < this->referenced.size(); i++) {
             auto referencedColumns = this->referenced[i]->referenced;
             auto referenceColumns = this->referenced[i]->reference;
@@ -405,6 +352,8 @@ namespace WellDoneDB
             if (referenceTab->rowExist(row, referenceColumns))
                 throw new Bad_Table("Error this delete violates foreign key with: " + referenceTab->getName());
         }
+        funzione di check commentata perché non richiesta dal progetto
+        */
         for (int i = 0; i < this->columns.size(); i++) {
             columns[i]->remove(index, drop);
         }
@@ -665,16 +614,17 @@ namespace WellDoneDB
     }
 
     Types stringToType(std::string type) {
-        if (type == "INT")
+        if (type == "INT" || type == "int")
             return Types::INT;
-        else if (type == "FLOAT")
+        else if (type == "FLOAT" || type == "float")
             return Types::FLOAT;
-        else if (type == "DATE")
+        else if (type == "DATE" || type == "date")
             return Types::DATE;
-        else if (type == "TIME")
+        else if (type == "TIME" || type == "time")
             return Types::TIME;
-        else if (type == "TEXT")
+        else if (type == "TEXT" || type == "text")
             return Types::TEXT;
+        else if (type == "CHAR" || type == "char");
         else if (type == "NULLED")
             return Types::NULLED;
         else return Types::NOTVALID;
@@ -790,10 +740,9 @@ namespace WellDoneDB
 
     void VectorizedTable::truncate()
     {
-        std::vector<int> positions;
-        for (int i = 0; i < this->getMaxSize(); i++)
-            positions.push_back(i);
-        this->removeRows(positions, true);
+        for (int i = 0; i < this->columns.size(); i++) {
+            this->columns[i]->clear();
+        }
     }
  
     Conditions conditionToString(std::string value) {
@@ -801,6 +750,7 @@ namespace WellDoneDB
         else if (value == "<") return Conditions::LESSTHAN;
         else if (value == ">=") return Conditions::GREATEREQTHAN;
         else if (value == "<=") return Conditions::LESSEQTHAN;
+        else if (value == "<>") return Conditions::NOT;
         else return Conditions::EQUAL;
 
     }

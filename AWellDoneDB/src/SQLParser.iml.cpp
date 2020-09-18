@@ -27,7 +27,7 @@ namespace WellDoneDB {
 		else if (word == "DESC" || word == "desc") return TAG::DESC;
 		else if (word == "BETWEEN" || word == "between") return TAG::BETWEEN;
 		else if (word == "LIKE" || word == "like") return TAG::LIKE;
-		else if (word == "DROP TABLE" || word == "drop from") return TAG::DROP;
+		else if (word == "DROP TABLE" || word == "drop table") return TAG::DROP;
 		else if (word == "TRUNCATE TABLE" || word == "truncate table") return TAG::TRUNCATE;
 		else if (word == "ORDER BY" || word == "order by") return TAG::ORDER_BY;
 		else if (word == "FROM" || word == "from") return TAG::FROM;
@@ -59,6 +59,17 @@ namespace WellDoneDB {
 		return false;
 	}
 
+
+	bool _concatop(std::string buffer) {
+		std::vector<const char *> operators = { "INSERT","DELETE","DROP","ORDER", "CREATE",
+			"TRUNCATE","PRIMARY","FOREIGN","insert" , "delete" ,"drop","order","create","truncate","primary","foreign"};
+		for (int i = 0; i < operators.size(); i++) {
+			if (buffer == operators[i])
+				return true;
+		}
+		return false;
+	}
+
 	SQLTokenizer::SQLTokenizer(std::string query) : query{ query } {
 		auto c = query.begin();
 		std::string buffer;
@@ -80,6 +91,8 @@ namespace WellDoneDB {
 				while (*c != '\'') {
 					buffer += *c;
 					c++;
+					if (c == query.end())
+						throw new Bad_Query("Error while parsing string: " + buffer + "reached end of line unexpected check string close");
 				}
 				this->tokens.push_back(SQLToken(TAG::VALUE, buffer));
 				c++;
@@ -200,7 +213,7 @@ namespace WellDoneDB {
 						break;
 					}
 					if (*c == ' ') {
-						if (buffer == "INSERT" || buffer == "DELETE" || buffer == "DROP" || buffer == "ORDER" || buffer == "CREATE" || buffer == "TRUNCATE" || buffer == "PRIMARY" || buffer == "FOREIGN") {
+						if (_concatop(buffer)) {
 							buffer += *c;
 							c++;
 							while (_isLecter(*c)) {
@@ -208,14 +221,14 @@ namespace WellDoneDB {
 								c++;
 							}
 						}
-						if (buffer == "NOT") {
+						if (buffer == "NOT" || buffer == "not") {
 							std::string secondaryBuffer;
 							c++;
 							while (c != query.end() && _isLecter(*c)) {
 								secondaryBuffer += *c;
 								c++;
 							}
-							if (secondaryBuffer == "NULL") {
+							if (secondaryBuffer == "NULL" || secondaryBuffer == "null") {
 								buffer += " " + secondaryBuffer;
 								this->tokens.push_back(SQLToken(_wordIdentificator(buffer), buffer));
 							}
@@ -489,8 +502,11 @@ namespace WellDoneDB {
 	}
 
 	void SQLlexer::_conditions() {
-		while (c->tag == TAG::COLUMN || c->tag == TAG::CONDITION || c->tag == TAG::VALUE || c->tag == TAG::COLUMNORTABLE)
+		while (c->tag == TAG::COLUMN || c->tag == TAG::CONDITION || c->tag == TAG::VALUE || c->tag == TAG::COLUMNORTABLE) {
+			if (c->tag == TAG::COLUMNORTABLE)
+				c->tag = TAG::COLUMN;
 			c++;
+		}
 	}
 
 
@@ -542,8 +558,17 @@ namespace WellDoneDB {
 			this->c = actualQuery.begin();
 			switch (c->tag)
 			{
+			case TAG::UPDATE:
+				try {
+					parseUpdate();
+				}
+				catch(...){}
+				break;
 			case TAG::SELECT:
-				parseSelect();
+				try {
+					parseSelect();
+				}
+				catch(...){}
 				break;
 
 			case TAG::CREATE_TABLE:
@@ -575,12 +600,22 @@ namespace WellDoneDB {
 				}
 				catch(...){}
 				break;
+
+			case TAG::TRUNCATE:
+				try {
+					parseTruncate();
+				}
+				catch(...){}
 			default:
 				break;
 			}
 		}
 	}
 
+
+#define __AssertTableExist__(tableName)\
+	if (!this->connected_db->exist(tableName))\
+		throw new Bad_Query("Error table " + tableName + " don't exist in this database")
 
 
 	void SQLParser::parseSelect()
@@ -602,8 +637,7 @@ namespace WellDoneDB {
 			c += 2;
 		}
 		table = c->value;
-		if (!this->connected_db->exist(table))
-			throw new Bad_Query("Error table " + table + " don't exist in this database");
+		__AssertTableExist__(table);
 		if (cols.empty())
 			cols = this->connected_db->get(table)->getColNames();
 		else {
@@ -752,8 +786,7 @@ namespace WellDoneDB {
 				}
 				c += 2;
 				tableReferenced = c->value;
-				if (!connected_db->exist(tableReferenced))
-					throw new Bad_Query("Error table " + tableReferenced + " not exist in this database");
+				__AssertTableExist__(tableReferenced);
 				c += 2;
 				while (c->tag != TAG::CLOSEBRACKET) {
 					if (c->tag == TAG::COLUMN)
@@ -765,7 +798,7 @@ namespace WellDoneDB {
 						throw new Bad_Query("Error column " + referenceColumns[i] + " not specified");
 				}
 				for (int i = 0; i < columnReferenced.size(); i++) {
-					if (!connected_db->get(tableReferenced)->columnExist(referenceColumns[i]))
+					if (!connected_db->get(tableReferenced)->columnExist(columnReferenced[i]))
 						throw new Bad_Query("Error column " + columnReferenced[i] + " not specified");
 				}
 				connected_db->createExternalKey(table, tableReferenced, referenceColumns, columnReferenced);
@@ -783,8 +816,7 @@ namespace WellDoneDB {
 		std::string table;
 		c++;
 		table = c->value;
-		if (!this->connected_db->exist(table))
-			throw new Bad_Query("Error table " + table + " don't exist in this database");
+		__AssertTableExist__(table);
 		c += 2;
 		while (c->tag != TAG::COMMAPOINT)
 		{
@@ -794,8 +826,7 @@ namespace WellDoneDB {
 
 			if (c->tag == TAG::VALUE) {
 				column = c[-2].value;
-				if (!this->connected_db->exist(table))
-					throw new Bad_Query("Error table " + table + " don't exist in this database");
+				__AssertTableExist__(table);
 				condition = conditionToString(c[-1].value);
 				value = stringToType(c->value, typeRetriever(c->value));
 				if (sel == nullptr)
@@ -808,8 +839,7 @@ namespace WellDoneDB {
 			else if (c->tag == TAG::BETWEEN) {
 				TAG chainCond = c[-2].tag;
 				column = c[-1].value;
-				if (!this->connected_db->exist(table))
-					throw new Bad_Query("Error table " + table + " don't exist in this database");
+				__AssertTableExist__(table);
 				c++;
 				Type* valueA = stringToType(c->value, typeRetriever(c->value));
 				c += 2;
@@ -838,22 +868,15 @@ namespace WellDoneDB {
 	{
 		c++;
 		std::string table = c->value;
-		if (!this->connected_db->exist(table)) {
-			std::cerr<<"Error table " + table + " don't exist in this database" << std::endl;
-			return;
-		}
-		Table* tab = new VectorizedTable(table);
-		tab->copy(*this->connected_db->get(table));
-		this->connected_db->deleteTable(table);
-		this->connected_db->loadTable(tab);
+		__AssertTableExist__(table);
+		this->connected_db->get(table)->truncate();
 		std::cout << "Table " + table + " Truncated" << std::endl;
 	}
 
 	void SQLParser::parseInsert() {
 		c++;
 		std::string table = c->value;
-		if (!this->connected_db->exist(table))
-			throw new Bad_Query("Error table " + table + " don't exist in this database");
+		__AssertTableExist__(table);
 		std::vector<std::string> columns;
 		std::vector<Type*> data;
 		c += 2;
@@ -882,18 +905,74 @@ namespace WellDoneDB {
 	{
 		c++;
 		std::string table = c->value;
-		if (!this->connected_db->exist(table)) {
-			std::cerr << "Error table " + table + " don't exist in this database" << std::endl;
-			return;
-		}
+		__AssertTableExist__(table);
 		this->connected_db->deleteTable(table);
 		std::cout << "Table " + table + " Deleted";
 	}
 
+
+	void SQLParser::parseUpdate() {
+		using namespace std;
+		c++;
+		string table = c->value;
+		__AssertTableExist__(table);
+		c += 2;
+		vector<string> columns;
+		vector<Type*> data;
+		while (c->tag != TAG::WHERE && c->tag != TAG::COMMAPOINT) {
+			if (c->tag == TAG::COLUMN)
+				columns.push_back(c->value);
+			else if (c->tag == TAG::VALUE)
+				data.push_back(stringToType(c->value, typeRetriever(c->value)));
+			c++;
+		}
+		string column;
+		Conditions condition;
+		Type* value;
+		Selection* sel = nullptr;
+		while(c->tag != TAG::COMMAPOINT) {
+			if (c->tag == TAG::VALUE) {
+				column = c[-2].value;
+				condition = conditionToString(c[-1].value);
+				value = stringToType(c->value, typeRetriever(c->value));
+				if (sel == nullptr)
+					sel = new Selection(*this->connected_db->get(table)->get(column), condition, value);
+				else if (sel != nullptr && c[-3].tag == TAG::AND)
+					sel = new Selection((*sel && Selection(*this->connected_db->get(table)->get(column), condition, value)));
+				else if (sel != nullptr && c[-3].tag == TAG::OR)
+					sel = new Selection((*sel || Selection(*this->connected_db->get(table)->get(column), condition, value)));
+			}
+			else if (c->tag == TAG::BETWEEN) {
+				TAG chainCond = c[-2].tag;
+				column = c[-1].value;
+				c++;
+				Type* valueA = stringToType(c->value, typeRetriever(c->value));
+				c += 2;
+				Type* valueB = stringToType(c->value, typeRetriever(c->value));
+				if (chainCond == TAG::AND)
+					sel = new Selection(*sel && Selection(*this->connected_db->get(table)->get(column), valueA, valueB));
+				else if (chainCond == TAG::OR)
+					sel = new Selection(*sel || Selection(*this->connected_db->get(table)->get(column), valueA, valueB));
+				else
+					sel = new Selection(*this->connected_db->get(table)->get(column), valueA, valueB);
+			}
+			c++;
+		}
+		if(sel != nullptr)
+			for (int i = 0; i < columns.size(); i++) {
+				this->connected_db->get(table)->update(sel->getPos(), columns[i], data[i]);
+			}
+		else {
+			for (int i = 0; i < columns.size(); i++) {
+				auto positions = this->connected_db->get(table)->getColumns()[0]->getPositions();
+				this->connected_db->get(table)->update(positions, columns[i], data[i]);
+			}
+		}
+		cout << "Updated Table " + table <<endl;
+	}
 	
 	Types typeRetriever(std::string value) {
 		auto c = value.begin();
-
 		if (_isLecter(*c)) {
 			if (value.size() == 1)
 				return Types::CHAR;

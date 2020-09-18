@@ -45,8 +45,9 @@ namespace WellDoneDB{
 	{
 		std::vector<std::string> tables;
 		for (int i = 0; i < keyReferences.size(); i++) {
-			if (keyReferences[i]->table->getName() == tableName) {
-				tables.push_back(keyReferences[i]->reference->getName());
+			auto isName = keyReferences[i]->reference->getName();
+			if (isName == tableName) {
+				tables.push_back(keyReferences[i]->table->getName());
 			}
 		}
 		return tables;
@@ -64,12 +65,15 @@ namespace WellDoneDB{
 
 	void Database::deleteTable(std::string tableName)
 	{
+		/*
 		if (!this->getReferenced(tableName).empty()) {
 			throw new Bad_Database("Error this table contain column referenced");
 		}
+		funzione commentata perché non richiesta nel progetto
+		*/
 		if (!this->getReference(tableName).empty())
 			for (int i = 0; i < this->getReference(tableName).size(); i++) {
-				this->deleteExternalKey(tableName, this->getReference(tableName)[i]);
+				this->deleteExternalKey(this->getReference(tableName)[i],tableName);
 			}
 		this->get(tableName)->unsetReference();
 		for (int i = 0; i < this->tableNames.size(); i++) {

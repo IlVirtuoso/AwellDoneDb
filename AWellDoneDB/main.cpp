@@ -31,6 +31,20 @@ vector<Type*> generateTime(){
     return time;
 }
 
+int test() {
+    Database db("dance");
+    db.createTable("id");
+    db["id"]->createColumn("ids", Types::INT);
+    db["id"]->createColumn("dates", Types::DATE);
+    for (int i = 0; i < 1000; i++) {
+        db["id"]->addRow({ generateInt()[rand() % 100],generateDate()[rand() % 100] }, { "ids","dates" });
+    }
+    Selection sel1(*db["id"]->get("ids"), Conditions::LESSEQTHAN, (Type*)new Integer(100));
+    Selection sel2(*db["id"]->get("dates"), Conditions::GREATEREQTHAN, new Date("20-11-1997",Date::DD_MM_YYYY));
+    cout << db["id"]->select(sel1 || sel2)->sort("ids",true)->toString() << endl;
+    return 1;
+}
+
 int main(int argc, char* argv[]) {
     std::string command = "";
     Database* db = new Database("default");
@@ -39,7 +53,7 @@ int main(int argc, char* argv[]) {
         cout << std::endl;
         cout << "<WellDoneDB>";
         getline(cin, command);
-        if (command == "QUIT" || command == "quit") {
+        if (command == "QUIT" || command == "quit" || command == "quit()" || command == "QUIT()") {
             db->save();
             cout << "saving and exit program" << endl;
             exit(1);

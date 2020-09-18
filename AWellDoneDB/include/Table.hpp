@@ -28,7 +28,6 @@ namespace WellDoneDB
          * @param left 
          * @param right 
         */
-        void _typeQuickSort(int left, int right);
 
     public:
         /**
@@ -197,6 +196,8 @@ namespace WellDoneDB
          * @return stringa xml che contiene la colonna
         */
         std::string toXml();
+
+        void inline clear() { this->data.clear(); }
     };
 
     
