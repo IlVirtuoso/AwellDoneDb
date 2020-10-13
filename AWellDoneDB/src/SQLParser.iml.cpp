@@ -428,6 +428,11 @@ namespace WellDoneDB {
 			_optoperand();
 			break;
 
+		case TAG::LIKE:
+			c++;
+			_values();
+			_optoperand();
+			break;
 		case TAG::AND:
 			c++;
 			_conditions();
@@ -678,6 +683,17 @@ namespace WellDoneDB {
 						sel = new Selection(*sel || Selection(*this->connected_db->get(table)->get(column), valueA, valueB));
 					else
 						sel = new Selection(*this->connected_db->get(table)->get(column), valueA, valueB);
+				}
+				else if (c->tag == TAG::LIKE) {
+					column = c[-1].value;
+					std::string likeval = c[1].value;
+					if (sel == nullptr)
+						sel = new Selection(*this->connected_db->get(table)->get(column),likeval);
+					else if (sel != nullptr && c[-2].tag == TAG::AND)
+						sel = new Selection((*sel && Selection(*this->connected_db->get(table)->get(column), likeval)));
+					else if (sel != nullptr && c[-2].tag == TAG::OR)
+						sel = new Selection((*sel || Selection(*this->connected_db->get(table)->get(column), likeval)));
+					c++;
 				}
 				c++;
 			}
@@ -955,6 +971,17 @@ namespace WellDoneDB {
 					sel = new Selection(*sel || Selection(*this->connected_db->get(table)->get(column), valueA, valueB));
 				else
 					sel = new Selection(*this->connected_db->get(table)->get(column), valueA, valueB);
+			}
+			else if (c->tag == TAG::LIKE) {
+				column = c[-1].value;
+				std::string likeval = c[1].value;
+				if (sel == nullptr)
+					sel = new Selection(*this->connected_db->get(table)->get(column), likeval);
+				else if (sel != nullptr && c[-2].tag == TAG::AND)
+					sel = new Selection((*sel && Selection(*this->connected_db->get(table)->get(column), likeval)));
+				else if (sel != nullptr && c[-2].tag == TAG::OR)
+					sel = new Selection((*sel || Selection(*this->connected_db->get(table)->get(column), likeval)));
+				c++;
 			}
 			c++;
 		}

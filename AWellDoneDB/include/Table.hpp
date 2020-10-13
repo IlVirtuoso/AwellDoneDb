@@ -231,6 +231,13 @@ namespace WellDoneDB
         Selection(Column col, Type* lowInterval, Type* highInterval);
 
         /**
+         * @brief Costruttore per la selezione con operatore Like
+         * @param col colonna di referenza
+         * @param like stringa like del tipo "%l%"
+        */
+        Selection(Column col, std::string like);
+
+        /**
          * @brief Costruttore vuoto usato dagli operators
         */
         Selection(){}

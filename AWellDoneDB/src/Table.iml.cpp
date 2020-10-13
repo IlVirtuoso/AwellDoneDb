@@ -99,10 +99,10 @@ namespace WellDoneDB
     }
 
     bool _comparePairDesc(Pair<Type*, int> a, Pair<Type*, int> b) {
-        return (*a.value > *b.value);
+        return (*a.value > * b.value);
     }
     void Column::sort(bool desc) {
-        if(!desc) std::sort(this->data.begin(), this->data.end(), _comparePairAsc);
+        if (!desc) std::sort(this->data.begin(), this->data.end(), _comparePairAsc);
         else std::sort(this->data.begin(), this->data.end(), _comparePairDesc);
     }
 
@@ -164,12 +164,12 @@ namespace WellDoneDB
     }
 
     /**
-     * @brief Funzione di comparazione per tipi 
+     * @brief Funzione di comparazione per tipi
      * @param a dato Type*
      * @param condition condizione
      * @param b dato Type*, in caso la condizione é between sará il valore minimo dell'intervallo
      * @param c dato Type*, é il valore massimo dell'intervallo altrimenti non viene usato
-     * @return 
+     * @return
     */
     bool _typeCompare(Type* a, Conditions condition, Type* b, Type* c = nullptr) {
         switch (condition)
@@ -213,7 +213,35 @@ namespace WellDoneDB
         }
     }
 
- 
+    bool _strlike(std::string start, std::string compare, bool end) {
+        auto c = start.begin();
+        auto b = compare.begin();
+        while (c != start.end() && b != compare.end()) {
+            if (*c == *b) { c++; b++; }
+            else if (*b == '_') { c++; b++; }
+            else if (*c != *b) { b = compare.begin(); c++; }
+        }
+        if (end) { if (b == compare.end() && c == start.end()) return true; }
+        else { if (b == compare.end() && c != start.end()) return true; }
+        return false;
+    }
+
+#define __castTypeToString__(type) (dynamic_cast<Text*>(type))->getData()
+    Selection::Selection(Column col, std::string like) : condition{ Conditions::EQUAL }, dataCompare{ nullptr }, col{ &col } {
+        if (col.getType() != Types::TEXT) throw "Bad like operator";
+        bool end = false, start = false;
+        if (like[0] == '%') end = true;
+        if (like[like.size() - 1] == '%') start = true;
+        if (start && end) throw "Bad like operator";
+        for (int i = 0; i < like.size(); i++)
+            if (like[i] == '%') like.erase(like.begin() + i);
+        for (int i = 0; i < col.getSize(); i++) {
+            if (_strlike(__castTypeToString__(col.get(i).value), like,end))
+                this->positions.push_back(col.get(i));
+        }
+    }
+
+
     Selection Selection::operator&&(Selection sel) {
         Selection newSel;
         newSel.col = this->col;
