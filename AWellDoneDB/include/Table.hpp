@@ -63,7 +63,9 @@ namespace WellDoneDB
          * @param autoincrement 
         */
         Column(std::string name, std::string tableName, Types type, std::vector<Pair<Type *, int>> elements = std::vector<Pair<Type *, int>>{}, bool not_null = false, bool index = false, bool autoincrement = false) : name{name}, tableName{tableName}, type{type}, data{elements}, index{index}, not_null{not_null}, autoincrement{autoincrement} {}
+       
 
+        void inline setName(std::string newName) { this->name = newName; }
         /**
          * @brief Aggiunge un elemento alla colonna
          * @param data elemento da aggiungere
@@ -213,6 +215,11 @@ namespace WellDoneDB
         Column* col;
         bool exist(Pair<Type*, int>& check);
     public:
+        class Bad_Selection {
+        public:
+            std::string message;
+            Bad_Selection(std::string message) { this->message = message; std::cout << message << std::endl; }
+        };
         /**
          * @brief Costruttore della selezione per comparazione
          * @param col colonna su cui effettuare la selezione
@@ -236,6 +243,15 @@ namespace WellDoneDB
          * @param like stringa like del tipo "%l%"
         */
         Selection(Column col, std::string like);
+
+        /**
+         * @brief Metodo di selezione per where su join
+         * @param col1 colonna della prima tabella
+         * @param condition condizione
+         * @param col2 colonna della seconda tabella
+         * @warning prima di usare questa selezione é bene usare l'operatore * tra le due tabelle e effettuare su di esse la selezione
+        */
+        Selection(Column col1, Conditions condition, Column col2);
 
         /**
          * @brief Costruttore vuoto usato dagli operators
@@ -511,6 +527,8 @@ namespace WellDoneDB
          * @brief Svuota la tabella del suo contenuto
         */
         virtual void truncate() = 0;
+
+        void setColumnName(std::string oldName, std::string newName);
     };
 
 
@@ -542,7 +560,7 @@ namespace WellDoneDB
         std::string getName() { return this->name; }
         size_t getColNum() { return this->columns.size(); }
         inline Column* at(int index) { return this->columns[index]; }
-        VectorizedTable operator*(Table& table);
+        VectorizedTable operator*(VectorizedTable& table);
         void copy(Table& table) override;
         std::vector<std::string> getColNames() override;
         std::string toString() override;

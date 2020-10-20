@@ -131,7 +131,7 @@ namespace WellDoneDB {
 					buffer.clear();
 				}
 				else if (*c == '>' || *c == '=') { 
-					buffer += *c; this->tokens.push_back(SQLToken(TAG::CONDITION, buffer));
+					buffer += *c; this->tokens.push_back(SQLToken(TAG::CONDITION, buffer)); buffer.clear(); c++;
 				}
 				else if (!(_isCharNumber(*c) || _isLecter(*c))) {
 					throw new Bad_Query("Query error, wrong condition near: " + this->tokens[this->tokens.size() - 1].value + "at char: " + *c);
@@ -622,7 +622,7 @@ namespace WellDoneDB {
 	if (!this->connected_db->exist(tableName))\
 		throw new Bad_Query("Error table " + tableName + " don't exist in this database")
 
-
+	/*
 	void SQLParser::parseSelect()
 	{
 		std::vector<std::string> cols;
@@ -715,6 +715,172 @@ namespace WellDoneDB {
 			std::cout << temp->sort(orderColumn, desc)->project(cols)->select(*sel)->toString() << std::endl;
 		else
 			std::cout << temp->select(*sel)->project(cols)->toString() << std::endl;
+	}
+	*/
+
+	
+	void SQLParser::parseSelect() {
+		using String = std::string;
+		using StringArray = std::vector<std::string>;
+		c++;
+		StringArray cols;
+		StringArray tables;
+		bool asteriskop = false;
+		//trova le colonne
+		if (c->tag == TAG::ASTERISKOP) { asteriskop = true; c++;}
+		else {
+			while (c->tag != TAG::FROM) {
+				if (c->tag == TAG::COLUMN)
+					cols.push_back(c->value);
+				c++;
+			}
+		}
+		//trova le tabelle
+		if (c->tag == TAG::FROM) {
+			while (c->tag != TAG::WHERE && c->tag != TAG::COMMAPOINT && c->tag != TAG::ORDER_BY) {
+				if (c->tag == TAG::TABLE)
+					tables.push_back(c->value);
+				c++;
+			}
+		}
+		//aggiunge tutte le colonne se asterisco
+		if (asteriskop) {
+			for (int i = 0; i < tables.size(); i++) {
+				StringArray columns = connected_db->get(tables[i])->getColNames();
+				for (int k = 0; k < columns.size(); k++) cols.push_back(columns[k]);
+			}
+		}
+		//normalizza i nomi di colonne in caso di join
+		if (tables.size() > 1) {
+			for (int i = 0; i < cols.size(); i++) {
+				if (cols[i].find(".", 0) == std::string::npos) {
+					bool founded = false;
+					String currentcol = cols[i];
+					for (int k = 0; k < tables.size(); k++) {
+						if (connected_db->get(tables[k])->columnExist(currentcol)) {
+							if (founded) throw new Bad_Query("Error same column:" + currentcol + " not specified and present in two tables");
+							founded = true;
+							cols[i] = tables[k] + "." + cols[i];
+						}
+					}
+				}
+			}
+		}
+		//crea un unica tabella su cui effettuare le selezioni
+		VectorizedTable* temp = nullptr;
+		if (tables.size() == 1) { __AssertTableExist__(tables[0]); temp = dynamic_cast<VectorizedTable*>(connected_db->get(tables[0])); }
+		else {
+			for (int i = 0; i < tables.size(); i++) {
+				__AssertTableExist__(tables[i]);
+				if (temp == nullptr) temp = dynamic_cast<VectorizedTable*>(connected_db->get(tables[i]));
+				else {
+					VectorizedTable* join = dynamic_cast<VectorizedTable*>(connected_db->get(tables[i]));
+					*temp = *temp * *join;
+				}
+			}
+		}
+		//genera le selezioni in caso di where
+		Selection* sel = nullptr;
+		if (c->tag == TAG::WHERE) {
+			while (c->tag != TAG::ORDER_BY && c->tag != TAG::COMMAPOINT) {
+				std::string column;
+				Conditions condition;
+				Type* value;
+				if (c->tag == TAG::VALUE) {
+					column = c[-2].value;
+					//standardizza il nome della colonna
+					if (!column.find(".") && tables.size() > 1) {
+						for (int i = 0; i < cols.size(); i++) {
+							if (cols[i].find(column))
+								column = cols[i];
+						}
+					}
+					//trova la condizione e continua
+					condition = conditionToString(c[-1].value);
+					value = stringToType(c->value, typeRetriever(c->value));
+					if (sel == nullptr)
+						sel = new Selection(*temp->get(column), condition, value);
+					else if (sel != nullptr && c[-3].tag == TAG::AND)
+						sel = new Selection((*sel && Selection(*temp->get(column), condition, value)));
+					else if (sel != nullptr && c[-3].tag == TAG::OR)
+						sel = new Selection((*sel || Selection(*temp->get(column), condition, value)));
+				}
+				//caso between
+				else if (c->tag == TAG::BETWEEN) {
+					TAG chainCond = c[-2].tag;
+					column = c[-1].value;
+					//standardizza il nome della colonna
+					if (!column.find(".") && tables.size() > 1) {
+						for (int i = 0; i < cols.size(); i++) {
+							if (cols[i].find(column))
+								column = cols[i];
+						}
+					}
+					//continua
+					c++;
+					Type* valueA = stringToType(c->value, typeRetriever(c->value));
+					c += 2;
+					Type* valueB = stringToType(c->value, typeRetriever(c->value));
+					if (chainCond == TAG::AND)
+						sel = new Selection(*sel && Selection(*temp->get(column), valueA, valueB));
+					else if (chainCond == TAG::OR)
+						sel = new Selection(*sel || Selection(*temp->get(column), valueA, valueB));
+					else
+						sel = new Selection(*temp->get(column), valueA, valueB);
+				}
+				//caso like
+				else if (c->tag == TAG::LIKE) {
+					column = c[-1].value;
+					std::string likeval = c[1].value;
+					if (sel == nullptr)
+						sel = new Selection(*temp->get(column), likeval);
+					else if (sel != nullptr && c[-2].tag == TAG::AND)
+						sel = new Selection((*sel && Selection(*temp->get(column), likeval)));
+					else if (sel != nullptr && c[-2].tag == TAG::OR)
+						sel = new Selection((*sel || Selection(*temp->get(column), likeval)));
+					c++;
+				}
+				//caso where tra due colonne
+				else if (tables.size() > 1 && c->tag == TAG::COLUMN && c[-2].tag == TAG::COLUMN) {
+					String col1 = c[-2].value;
+					Conditions condition = conditionToString(c[-1].value);
+					String col2 = c->value;
+					if (sel == nullptr)
+						sel = new Selection(*temp->get(col1),condition, *temp->get(col2));
+					else if (sel != nullptr && c[-2].tag == TAG::AND)
+						sel = new Selection((*sel && Selection(*temp->get(col1), condition, *temp->get(col2))));
+					else if (sel != nullptr && c[-2].tag == TAG::OR)
+						sel = new Selection((*sel || Selection(*temp->get(col1), condition, *temp->get(col2))));
+				}
+				c++;
+			}
+		}
+		//ordina la tabella secondo la colonna desiderata
+		if (c->tag == TAG::ORDER_BY) {
+			String column;
+			bool desc;
+			while (c->tag != TAG::COMMAPOINT) {
+				switch (c->tag)
+				{
+				case TAG::COLUMN:
+					column = c->value;
+					break;
+
+				case TAG::DESC:
+					desc = true;
+					break;
+				default:
+					break;
+				}
+				c++;
+			}
+			temp = dynamic_cast<VectorizedTable*>(temp->sort(column, desc));
+		}
+		//applica le selezioni
+		if (sel != nullptr)
+			temp = dynamic_cast<VectorizedTable*>(temp->select(*sel));
+		//stampa la tabella
+		std::cout << temp->project(cols)->toString() << std::endl;
 	}
 
 	void SQLParser::parseCreate() {
@@ -824,6 +990,9 @@ namespace WellDoneDB {
 		std::cout << "Table " + table + " created succesfully" << std::endl;
 
 	}
+	
+
+
 
 
 	void SQLParser::parseDelete()

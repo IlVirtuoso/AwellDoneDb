@@ -242,6 +242,16 @@ namespace WellDoneDB
     }
 
 
+    Selection::Selection(Column col1, Conditions condition, Column col2) {
+        if (col1.getSize() != col2.getSize()) { throw new Bad_Selection("Bad columns, you should use * operator on table first"); }
+        for (int i = 0; i < col1.getSize(); i++) {
+            if (_typeCompare(col1.get(i).value, condition, col2.get(i).value)) {
+                this->positions.push_back(col1.get(i));
+            }
+        }
+    }
+
+
     Selection Selection::operator&&(Selection sel) {
         Selection newSel;
         newSel.col = this->col;
@@ -439,18 +449,28 @@ namespace WellDoneDB
         }
         return vec;
     }
-
-    VectorizedTable VectorizedTable::operator*(Table& table) {
+    void Table::setColumnName(std::string oldName, std::string newName) {
+        this->get(oldName)->setName(newName);
+    }
+    VectorizedTable VectorizedTable::operator*(VectorizedTable& table) {
         VectorizedTable tab("X");
         tab.copy(*this);
         tab.copy(table);
         std::vector<std::string> thisreferences = this->getColNames();
         std::vector<std::string> tablereferences = table.getColNames();
         for (int i = 0; i < thisreferences.size(); i++) {
-            thisreferences[i] = this->getName() + "." + thisreferences[i];
+            if (thisreferences[i].find(".", 0) == std::string::npos) {
+                std::string oldName = thisreferences[i];
+                thisreferences[i] = this->getName() + "." + thisreferences[i];
+                tab.setColumnName(oldName, thisreferences[i]);
+            }
         }
         for (int i = 0; i < tablereferences.size(); i++) {
-            tablereferences[i] = table.getName() + "." + tablereferences[i];
+            if (tablereferences[i].find(".", 0) == std::string::npos) {
+                std::string oldName = tablereferences[i];
+                tablereferences[i] = table.getName() + "." + tablereferences[i];
+                tab.setColumnName(oldName, tablereferences[i]);
+            }
         }
         int thisColSizeReference = this->columns.at(0)->getSize();
         int tableColSizeReference = table.at(0)->getSize();
