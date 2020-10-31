@@ -718,7 +718,14 @@ namespace WellDoneDB {
 	}
 	*/
 
-	
+#define __normalizeColumn__(column)\
+if (column.find(".") == std::string::npos && tables.size() > 1) {\
+for (int i = 0; i < cols.size(); i++) {\
+	if (cols[i].find(column) != std::string::npos)\
+		column = cols[i];\
+}\
+}
+
 	void SQLParser::parseSelect() {
 		using String = std::string;
 		using StringArray = std::vector<std::string>;
@@ -772,7 +779,11 @@ namespace WellDoneDB {
 		else {
 			for (int i = 0; i < tables.size(); i++) {
 				__AssertTableExist__(tables[i]);
-				if (temp == nullptr) temp = dynamic_cast<VectorizedTable*>(connected_db->get(tables[i]));
+				if (temp == nullptr) {
+					VectorizedTable* get = dynamic_cast<VectorizedTable*>(connected_db->get(tables[i]));
+					temp = new VectorizedTable(get->getName());
+					*get >> temp;
+				}
 				else {
 					VectorizedTable* join = dynamic_cast<VectorizedTable*>(connected_db->get(tables[i]));
 					*temp = *temp * *join;
@@ -789,7 +800,7 @@ namespace WellDoneDB {
 				if (c->tag == TAG::VALUE) {
 					column = c[-2].value;
 					//standardizza il nome della colonna
-					if (!column.find(".") && tables.size() > 1) {
+					if (column.find(".")==std::string::npos && tables.size() > 1) {
 						for (int i = 0; i < cols.size(); i++) {
 							if (cols[i].find(column))
 								column = cols[i];
@@ -810,12 +821,7 @@ namespace WellDoneDB {
 					TAG chainCond = c[-2].tag;
 					column = c[-1].value;
 					//standardizza il nome della colonna
-					if (!column.find(".") && tables.size() > 1) {
-						for (int i = 0; i < cols.size(); i++) {
-							if (cols[i].find(column))
-								column = cols[i];
-						}
-					}
+					__normalizeColumn__(column);
 					//continua
 					c++;
 					Type* valueA = stringToType(c->value, typeRetriever(c->value));
@@ -831,6 +837,8 @@ namespace WellDoneDB {
 				//caso like
 				else if (c->tag == TAG::LIKE) {
 					column = c[-1].value;
+					//standardizza la colonna
+					__normalizeColumn__(column);
 					std::string likeval = c[1].value;
 					if (sel == nullptr)
 						sel = new Selection(*temp->get(column), likeval);
@@ -841,10 +849,12 @@ namespace WellDoneDB {
 					c++;
 				}
 				//caso where tra due colonne
-				else if (tables.size() > 1 && c->tag == TAG::COLUMN && c[-2].tag == TAG::COLUMN) {
+				else if (tables.size() > 1 && c->tag == TAG::COLUMN && c[-2].tag == TAG::COLUMN && c[-1].tag == TAG::CONDITION) {
 					String col1 = c[-2].value;
+					__normalizeColumn__(col1);
 					Conditions condition = conditionToString(c[-1].value);
 					String col2 = c->value;
+					__normalizeColumn__(col2);
 					if (sel == nullptr)
 						sel = new Selection(*temp->get(col1),condition, *temp->get(col2));
 					else if (sel != nullptr && c[-2].tag == TAG::AND)
@@ -858,7 +868,7 @@ namespace WellDoneDB {
 		//ordina la tabella secondo la colonna desiderata
 		if (c->tag == TAG::ORDER_BY) {
 			String column;
-			bool desc;
+			bool desc = false;
 			while (c->tag != TAG::COMMAPOINT) {
 				switch (c->tag)
 				{
